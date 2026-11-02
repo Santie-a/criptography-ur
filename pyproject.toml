@@ -1,13 +1,15 @@
 [project]
 name = "minichain"
-version = "0.1.0"
+version = "1.0.0"
 description = "Mini-blockchain con ECDSA sobre secp256k1 programado desde cero, y un ataque por nonce repetido"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=7", "ecdsa>=0.18"]
+server = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
+test = ["pytest>=7", "ecdsa>=0.18", "httpx>=0.27"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning:starlette.*", "ignore:.*httpx2.*"]

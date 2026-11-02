@@ -124,3 +124,40 @@ def test_rejects_overspend_replay_and_impersonation(setup):
 def test_json_roundtrip_of_transactions(setup):
     tx = setup[0].blocks[1].transactions[1]
     assert Transaction.from_dict(tx.to_dict()).txid() == tx.txid()
+
+
+def test_merkle_proofs_for_every_leaf():
+    from minichain.merkle import merkle_proof, verify_merkle_proof
+    for size in range(1, 9):
+        txids = [hashlib.sha256(bytes([i])).hexdigest() for i in range(size)]
+        root = merkle_root(txids)
+        for i, t in enumerate(txids):
+            proof = merkle_proof(txids, i)
+            assert verify_merkle_proof(t, proof, root)
+            assert not verify_merkle_proof("ff" * 32, proof, root)
+
+
+def test_chain_json_roundtrip_revalidates(setup):
+    chain = setup[0]
+    copy_ = Blockchain.from_json(chain.to_json())
+    assert copy_.tip.hash() == chain.tip.hash()
+    data = chain.to_dict()
+    data["blocks"][1]["transactions"][1]["amount"] = 999
+    with pytest.raises(InvalidBlock):
+        Blockchain.from_dict(data)
+
+
+def test_node_mempool_tracks_pending_state(setup):
+    from minichain.node import Node, RejectedTransaction
+    chain, alice, bob, miner = setup
+    node = Node(chain)
+    seq = node.next_seq(alice.address)
+    node.submit(Transaction.create(alice, bob.address, 40, seq))
+    assert node.next_seq(alice.address) == seq + 1
+    with pytest.raises(RejectedTransaction):  # el saldo pendiente ya no alcanza
+        node.submit(Transaction.create(alice, bob.address, node.available_balance(alice.address) + 1, seq + 1))
+    block, _ = node.mine(miner.address, difficulty=DIFF + 2)
+    assert block.difficulty == DIFF + 2 and node.mempool == []
+    assert chain.validate().ok
+    with pytest.raises(ValueError):
+        node.mine(miner.address, difficulty=DIFF - 1)

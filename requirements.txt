@@ -1,4 +1,4 @@
-# El proyecto no tiene dependencias en tiempo de ejecución.
-# Solo las pruebas las usan: `ecdsa` sirve como referencia para comparar.
-ecdsa>=0.18
-pytest>=7
+# El núcleo (minichain/) no tiene dependencias: `python -m minichain` funciona sin instalar nada.
+# Esto es lo que necesita el servidor que conecta la UI con la simulación:
+fastapi>=0.115
+uvicorn[standard]>=0.30

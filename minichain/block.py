@@ -128,6 +128,18 @@ class Block:
             "transactions": [tx.to_dict() for tx in self.transactions],
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "Block":
+        return cls(
+            index=data["index"],
+            prev_hash=data["prev_hash"],
+            timestamp=data["timestamp"],
+            difficulty=data["difficulty"],
+            transactions=[Transaction.from_dict(t) for t in data["transactions"]],
+            merkle_root=data["merkle_root"],
+            nonce=data["nonce"],
+        )
+
 
 def meets_difficulty(block_hash: str, difficulty: int) -> bool:
     """El hash, leído como entero de 256 bits, debe ser < 2^(256 - difficulty)."""

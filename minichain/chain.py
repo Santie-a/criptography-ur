@@ -53,11 +53,16 @@ class Blockchain:
         self.ledger = trial
 
     def mine_block(self, transactions: list[Transaction], miner_address: str,
-                   timestamp: int) -> tuple[Block, int]:
-        """Arma un bloque con la recompensa del minero, lo mina y lo agrega."""
+                   timestamp: int, difficulty: int | None = None) -> tuple[Block, int]:
+        """Arma un bloque con la recompensa del minero, lo mina y lo agrega.
+
+        `difficulty` permite minar un bloque más difícil que el mínimo de la
+        red (nunca más fácil: el validador lo rechazaría).
+        """
         txs = [Transaction.coinbase(miner_address, BLOCK_REWARD, f"recompensa bloque {len(self.blocks)}")]
         txs.extend(transactions)
-        block = Block(len(self.blocks), self.tip.hash(), timestamp, self.difficulty, txs)
+        block = Block(len(self.blocks), self.tip.hash(), timestamp,
+                      self.difficulty if difficulty is None else difficulty, txs)
         attempts = mine(block)
         self.add_block(block)
         return block, attempts
@@ -65,6 +70,20 @@ class Blockchain:
     def validate(self) -> ValidationReport:
         return validate_chain(self.blocks, self.difficulty)
 
+    def to_dict(self) -> dict:
+        return {"difficulty": self.difficulty, "blocks": [b.to_dict() for b in self.blocks]}
+
     def to_json(self) -> str:
-        return json.dumps({"difficulty": self.difficulty,
-                           "blocks": [b.to_dict() for b in self.blocks]}, indent=2)
+        return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Blockchain":
+        """Reconstruye una cadena validando cada bloque (lanza InvalidBlock)."""
+        chain = cls(data["difficulty"])
+        for block in data["blocks"]:
+            chain.add_block(Block.from_dict(block))
+        return chain
+
+    @classmethod
+    def from_json(cls, text: str) -> "Blockchain":
+        return cls.from_dict(json.loads(text))

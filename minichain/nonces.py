@@ -116,3 +116,24 @@ class WeakRNGNonce:
         state = self._rng.getrandbits(self.entropy_bits)
         out = hashlib.sha256(b"weak-rng" + state.to_bytes(8, "big")).digest()
         return int.from_bytes(out, "big") % (curve.n - 1) + 1
+
+
+NONCE_KINDS = {
+    "rfc6979": "RFC 6979 (determinista)",
+    "random": "Aleatorio del sistema operativo",
+    "weak": "RNG defectuoso (Android 2013)",
+    "constant": "k constante (PS3 2010)",
+}
+
+
+def nonce_kind(fn: NonceFn) -> str:
+    """Identificador corto de una estrategia: rfc6979, random, weak o constant."""
+    if fn is rfc6979_nonce:
+        return "rfc6979"
+    if fn is random_nonce:
+        return "random"
+    if isinstance(fn, WeakRNGNonce):
+        return "weak"
+    if isinstance(fn, ConstantNonce):
+        return "constant"
+    return "custom"

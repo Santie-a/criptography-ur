@@ -1,0 +1,12 @@
+services:
+  minichain:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      MINICHAIN_SEED: "2026"
+      MINICHAIN_DIFFICULTY: "14"
+      MINICHAIN_MAX_DIFFICULTY: "20"
+      # La UI se sirve desde el mismo origen, así que CORS no hace falta.
+      MINICHAIN_CORS: ""
+    restart: unless-stopped

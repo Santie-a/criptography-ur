@@ -147,6 +147,40 @@ def scalar_mult(k: int, P: Point) -> Point:
     return R
 
 
+def scalar_mult_trace(k: int, P: Point) -> list[dict]:
+    """Igual que scalar_mult, pero registra cada paso (para visualizarlo)."""
+    if k <= 0:
+        raise ValueError("k debe ser positivo")
+    steps = []
+    R = P.curve.infinity
+    for i, bit in enumerate(bin(k)[2:]):
+        R = point_double(R)
+        steps.append({"bit_index": i, "bit": bit, "op": "double", "point": R})
+        if bit == "1":
+            R = point_add(R, P)
+            steps.append({"bit_index": i, "bit": bit, "op": "add", "point": R})
+    return steps
+
+
+def enumerate_points(curve: Curve, limit: int = 5000) -> list[Point]:
+    """Todos los puntos afines de una curva pequeña (más O al inicio).
+
+    Usa el criterio de Euler para saber si x^3 + ax + b es un cuadrado.
+    """
+    if curve.p > limit:
+        raise ValueError(f"p demasiado grande para enumerar (máximo {limit})")
+    p = curve.p
+    roots: dict[int, list[int]] = {}
+    for y in range(p):
+        roots.setdefault(y * y % p, []).append(y)
+    pts = [curve.infinity]
+    for x in range(p):
+        rhs = (x * x * x + curve.a * x + curve.b) % p
+        for y in roots.get(rhs, []):
+            pts.append(Point(curve, x, y))
+    return pts
+
+
 def encode_point(P: Point, compressed: bool = True) -> bytes:
     """Codificación SEC1: 02/03 || x (comprimida) o 04 || x || y."""
     if P.is_infinity:
@@ -179,6 +213,16 @@ def decode_point(curve: Curve, data: bytes) -> Point:
             y = curve.p - y
         return Point(curve, x, y)
     raise ValueError("codificación de punto inválida")
+
+
+def point_order(P: Point, max_order: int = 100_000) -> int:
+    """Orden de P en el grupo (búsqueda lineal, solo para curvas pequeñas)."""
+    Q, k = P, 1
+    while not Q.is_infinity:
+        Q, k = Q + P, k + 1
+        if k > max_order:
+            raise ValueError("orden demasiado grande")
+    return k
 
 
 # Curva de Bitcoin (SEC 2, sección 2.4.1).

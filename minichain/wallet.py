@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 
 from .curve import Point, encode_point, secp256k1
-from .nonces import NonceFn, rfc6979_nonce
+from .nonces import NonceFn, nonce_kind, rfc6979_nonce
 from .signatures import Signature, generate_private_key, public_key, sign
 
 
@@ -30,6 +30,10 @@ class Wallet:
     @classmethod
     def generate(cls, name: str, rng=None, nonce_fn: NonceFn = rfc6979_nonce) -> "Wallet":
         return cls(name, generate_private_key(secp256k1, rng), nonce_fn)
+
+    @property
+    def nonce_kind(self) -> str:
+        return nonce_kind(self.nonce_fn)
 
     @property
     def private_key(self) -> int:

@@ -115,3 +115,14 @@ def test_rejects_points_off_curve():
         Point(secp256k1, 1, 1)
     with pytest.raises(ValueError):
         decode_point(secp256k1, b"\x02" + (5).to_bytes(32, "big"))  # x=5: x^3+7 no es cuadrado
+
+
+def test_double_and_add_trace_and_enumeration():
+    from minichain.curve import enumerate_points, point_order, scalar_mult_trace
+    assert len(enumerate_points(TOY)) == len(all_points(TOY))
+    P = Point(TOY, 3, 6)
+    for k in (1, 2, 7, 13, 99):
+        steps = scalar_mult_trace(k, P)
+        assert steps[-1]["point"] == k * P
+        assert len(steps) == len(bin(k)[2:]) + bin(k).count("1")
+    assert point_order(P) == 5
