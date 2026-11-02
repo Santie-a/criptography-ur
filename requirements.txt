@@ -1,0 +1,4 @@
+# El proyecto no tiene dependencias en tiempo de ejecución.
+# Solo las pruebas las usan: `ecdsa` sirve como referencia para comparar.
+ecdsa>=0.18
+pytest>=7

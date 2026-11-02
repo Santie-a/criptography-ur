@@ -1,0 +1,13 @@
+[project]
+name = "minichain"
+version = "0.1.0"
+description = "Mini-blockchain con ECDSA sobre secp256k1 programado desde cero, y un ataque por nonce repetido"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7", "ecdsa>=0.18"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
