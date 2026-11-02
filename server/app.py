@@ -163,6 +163,22 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         await changed("reset")
         return await run_in_threadpool(net.state, bus.clients)
 
+    @app.get("/api/search", tags=["red"], summary="Buscar bloque, transacción, billetera o dirección")
+    async def search(q: str = ""):
+        return await run_in_threadpool(net.search, q)
+
+    @app.get("/api/transactions", tags=["transacciones"], summary="Transacciones confirmadas, más recientes primero")
+    async def transactions(address: str | None = None, limit: int = 200):
+        return await run_in_threadpool(net.transactions, address, max(1, min(limit, 1000)))
+
+    @app.get("/api/transactions/{txid}", tags=["transacciones"], summary="Detalle de una transacción")
+    async def transaction(txid: str):
+        return await run_in_threadpool(net.transaction, txid)
+
+    @app.get("/api/wallets/{name}", tags=["billeteras"], summary="Billetera con su historial")
+    async def wallet_detail(name: str):
+        return await run_in_threadpool(net.wallet_detail, name)
+
     @app.get("/api/blocks/{index}", tags=["cadena"])
     async def block(index: int):
         return await run_in_threadpool(net.block, index)

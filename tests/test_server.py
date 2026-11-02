@@ -121,3 +121,19 @@ def test_lab_recover_from_fixed_k(client):
     rec = client.post("/api/lab/ecdsa/recover", json={"r": a["r"], "s1": a["s"], "z1": a["z"], "s2": b["s"],
                                                       "z2": b["z"], "pubkey": a["Q"]["compressed"]}).json()
     assert rec["d"] == a["d"] and rec["matches_pubkey"]
+
+
+def test_search_transactions_and_wallet_detail(client):
+    st = client.get("/api/state").json()
+    assert client.get("/api/search", params={"q": "2"}).json()[0]["type"] == "block"
+    assert any(r["type"] == "wallet" for r in client.get("/api/search", params={"q": "ali"}).json())
+    txs = client.get("/api/transactions").json()
+    assert txs[0]["block"] == st["height"]
+    first = txs[0]
+    hits = client.get("/api/search", params={"q": first["txid"][:10]}).json()
+    assert any(h["type"] == "tx" and h["ref"] == first["txid"] for h in hits)
+    detail = client.get(f"/api/transactions/{first['txid']}").json()
+    assert detail["proof"]["valid"] and detail["block"] == first["block"]
+    assert client.get("/api/transactions/" + "0" * 64).status_code == 404
+    alice = client.get("/api/wallets/Alice").json()
+    assert alice["history"] and all(alice["address"] in (t["sender_address"], t["recipient"]) for t in alice["history"])

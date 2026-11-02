@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 from dataclasses import asdict, dataclass
 
 from minichain.attack import find_nonce_reuse, harvest_signatures, recover_private_keys
@@ -19,7 +20,7 @@ from minichain.merkle import merkle_levels, merkle_proof, verify_merkle_proof
 from minichain.node import Node, RejectedTransaction
 from minichain.nonces import NONCE_KINDS
 from minichain.ntheory import modinv
-from minichain.simulation import build_scenario, make_nonce_fn
+from minichain.simulation import BLOCK_INTERVAL, build_scenario, make_nonce_fn
 from minichain.validator import ValidationReport, validate_chain
 from minichain.wallet import Wallet
 
@@ -72,7 +73,9 @@ class Network:
         scenario = build_scenario(seed=params.seed, difficulty=params.difficulty,
                                   victim_nonce=params.victim_nonce,
                                   entropy_bits=params.entropy_bits,
-                                  n_blocks=params.n_blocks, tx_per_block=params.tx_per_block)
+                                  n_blocks=params.n_blocks, tx_per_block=params.tx_per_block,
+                                  # La historia simulada termina "ahora": las fechas se ven reales.
+                                  base_timestamp=int(time.time()) - (params.n_blocks + 1) * BLOCK_INTERVAL)
         with self.lock:
             self.params = params
             self.node = Node(scenario.chain)
@@ -235,6 +238,81 @@ class Network:
                 "proof": [{"sibling": s, "side": side} for s, side in path],
                 "valid": verify_merkle_proof(txids[tx_index], path, block.merkle_root),
             }
+
+    # ------------------------------------------------------------ consultas
+
+    def _tx_index(self) -> list[tuple[int, int, Transaction]]:
+        """(bloque, posición, tx) de toda la cadena, de la más reciente a la más vieja."""
+        out = []
+        for b in reversed(self.chain.blocks):
+            for j in range(len(b.transactions) - 1, -1, -1):
+                out.append((b.index, j, b.transactions[j]))
+        return out
+
+    def transactions(self, address: str | None = None, limit: int = 200) -> list[dict]:
+        with self.lock:
+            rows = []
+            for bi, j, tx in self._tx_index():
+                if address and address not in (tx.sender_address, tx.recipient):
+                    continue
+                row = self.tx_json(tx)
+                row.update(block=bi, position=j, timestamp=self.chain.blocks[bi].timestamp)
+                rows.append(row)
+                if len(rows) >= limit:
+                    break
+            return rows
+
+    def transaction(self, txid: str) -> dict:
+        with self.lock:
+            for tx in self.node.mempool:
+                if tx.txid() == txid:
+                    return {**self.tx_json(tx), "block": None, "position": None,
+                            "timestamp": None, "proof": None}
+            for bi, j, tx in self._tx_index():
+                if tx.txid() == txid:
+                    row = self.tx_json(tx)
+                    row.update(block=bi, position=j, timestamp=self.chain.blocks[bi].timestamp,
+                               proof=self.proof(bi, j))
+                    return row
+        raise NotFound("no existe esa transacción")
+
+    def wallet_detail(self, name: str) -> dict:
+        with self.lock:
+            w = self.wallet(name)
+            data = self.wallet_json(w)
+            data["history"] = self.transactions(w.address, limit=100)
+            data["signatures"] = sum(1 for t in data["history"] if t["sender_address"] == w.address)
+            return data
+
+    def search(self, query: str) -> list[dict]:
+        """Busca por número de bloque, nombre de billetera, dirección, hash o txid."""
+        q = query.strip().lower().removeprefix("0x")
+        if not q:
+            return []
+        results: list[dict] = []
+        with self.lock:
+            blocks = self.chain.blocks
+            if q.isdigit() and int(q) < len(blocks):
+                b = blocks[int(q)]
+                results.append({"type": "block", "ref": str(b.index), "label": f"Bloque {b.index}",
+                                "detail": b.hash()})
+            for name, w in self.wallets.items():
+                if q in name.lower() or (len(q) >= 4 and w.address.startswith(q)):
+                    results.append({"type": "wallet", "ref": name, "label": name, "detail": w.address})
+            if len(q) >= 4 and all(c in "0123456789abcdef" for c in q):
+                for b in blocks:
+                    if b.hash().startswith(q):
+                        results.append({"type": "block", "ref": str(b.index),
+                                        "label": f"Bloque {b.index}", "detail": b.hash()})
+                for bi, j, tx in self._tx_index():
+                    if tx.txid().startswith(q):
+                        results.append({"type": "tx", "ref": tx.txid(),
+                                        "label": f"Transacción en bloque {bi}", "detail": tx.txid()})
+                for tx in self.node.mempool:
+                    if tx.txid().startswith(q):
+                        results.append({"type": "tx", "ref": tx.txid(), "label": "Transacción pendiente",
+                                        "detail": tx.txid()})
+        return results[:12]
 
     def state(self, clients: int = 0) -> dict:
         with self.lock:

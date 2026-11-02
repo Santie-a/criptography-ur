@@ -36,9 +36,9 @@ mismo código: el servidor no reimplementa nada, solo llama a `minichain`.
 
 ## El recorrido de una acción
 
-Ejemplo: alguien pulsa **Firmar y enviar** en la página Cadena.
+Ejemplo: alguien pulsa **Transferir** en el encabezado y luego **Firmar y enviar**.
 
-1. `frontend/src/pages/Explorer.tsx` llama a `api.transfer("Alice", "Bob", 10, "")`.
+1. `frontend/src/components/dialogs.tsx` llama a `api.transfer("Alice", "Bob", 10, "")`.
 2. `frontend/src/api.ts` hace `POST /api/transactions/transfer` con JSON.
 3. `server/app.py` valida el cuerpo con Pydantic (`TransferRequest`) y llama a
    `Network.transfer` en un hilo aparte (para no bloquear el servidor).
@@ -48,7 +48,8 @@ Ejemplo: alguien pulsa **Firmar y enviar** en la página Cadena.
 5. El servidor publica `{"type": "mempool", "version": 7}` por el WebSocket a todos
    los clientes conectados.
 6. Cada navegador (`frontend/src/store.tsx`) recibe el evento, ve que la versión
-   cambió y vuelve a pedir `GET /api/state`. Todas las pantallas se actualizan.
+   cambió y vuelve a pedir `GET /api/state` (y repite el análisis de firmas para
+   las alertas). Todas las pantallas se actualizan.
 
 El protocolo en tiempo real es mínimo a propósito: los eventos solo dicen *qué
 cambió*; los datos siempre se piden por HTTP. Así no hay dos fuentes de verdad.
@@ -71,9 +72,13 @@ La referencia completa, con esquemas y un botón para probar cada llamada, está
 |---|---|---|
 | GET | `/api/state` | Billeteras, mempool, resumen de bloques, parámetros |
 | POST | `/api/reset` | Regenerar el escenario (semilla, dificultad, nonce de Bob…) |
+| GET | `/api/search?q=` | Búsqueda global: bloque, txid, billetera o dirección |
 | GET | `/api/blocks/{i}` | Bloque con transacciones y niveles del árbol de Merkle |
 | GET | `/api/blocks/{i}/proof/{tx}` | Prueba de inclusión Merkle |
 | GET | `/api/chain/export` | Cadena completa en JSON |
+| GET | `/api/transactions` | Transacciones confirmadas (filtro opcional `?address=`) |
+| GET | `/api/transactions/{txid}` | Una transacción con su bloque y prueba Merkle |
+| GET | `/api/wallets/{nombre}` | Billetera con su historial |
 | POST | `/api/wallets` | Crear billetera |
 | PUT | `/api/wallets/{nombre}/nonce` | Cambiar su estrategia de nonce |
 | POST | `/api/transactions/transfer` | El servidor firma con una billetera suya |
@@ -137,7 +142,8 @@ Ejemplo: mostrar cuántos bits en cero tiene cada hash de bloque.
 3. **Tipos**: refleja el campo en `frontend/src/types.ts`.
 4. **Cliente**: si es una ruta nueva, una línea en `frontend/src/api.ts`.
 5. **UI**: úsalo en la página. Para una página nueva, crea
-   `frontend/src/pages/MiPagina.tsx` y regístrala en `ROUTES` (`frontend/src/App.tsx`).
+   `frontend/src/pages/MiPagina.tsx`, regístrala en `PAGES` (`frontend/src/App.tsx`) y
+   agrega su entrada al grupo que corresponda en `NAV` (`frontend/src/components/shell.tsx`).
 6. **Prueba**: un caso en `tests/test_server.py` con `TestClient`.
 
 ## Variables de entorno

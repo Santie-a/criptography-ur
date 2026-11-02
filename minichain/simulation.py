@@ -48,7 +48,7 @@ class Scenario:
 
 def build_scenario(seed: int = 2026, difficulty: int = 14, victim_nonce: str = "weak",
                    entropy_bits: int = 3, n_blocks: int = 5, tx_per_block: int = 4,
-                   on_block=None) -> Scenario:
+                   on_block=None, base_timestamp: int = BASE_TIMESTAMP) -> Scenario:
     """Construye la cadena simulada. Todo sale de `seed` salvo los nonces
     aleatorios de Carol, que vienen del sistema operativo como debe ser.
 
@@ -66,7 +66,7 @@ def build_scenario(seed: int = 2026, difficulty: int = 14, victim_nonce: str = "
     }
     users = ["Alice", "Bob", "Carol"]
     chain = Blockchain.create({wallets[u].address: INITIAL_BALANCE for u in users},
-                              difficulty, BASE_TIMESTAMP)
+                              difficulty, base_timestamp)
     scenario = Scenario(chain, wallets, [chain.genesis_attempts])
     if on_block:
         on_block(chain.tip, chain.genesis_attempts)
@@ -86,7 +86,7 @@ def build_scenario(seed: int = 2026, difficulty: int = 14, victim_nonce: str = "
             pending.append(Transaction.create(wallet, wallets[recipient].address, amount, seq,
                                               rng.choice(memos)))
         block, attempts = chain.mine_block(pending, wallets["Minera"].address,
-                                           BASE_TIMESTAMP + b * BLOCK_INTERVAL)
+                                           base_timestamp + b * BLOCK_INTERVAL)
         scenario.mining_attempts.append(attempts)
         if on_block:
             on_block(block, attempts)

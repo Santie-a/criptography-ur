@@ -41,7 +41,7 @@ y abre http://localhost:5173.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest                 # 47 pruebas: núcleo, comparación con `ecdsa` y API
+python -m pytest                 # 48 pruebas: núcleo, comparación con `ecdsa` y API
 cd frontend && npm run typecheck
 ```
 
@@ -49,24 +49,34 @@ Con `make` instalado, `make install`, `make run`, `make test` y `make demo` hace
 
 ## La interfaz
 
-Seis pasos, en el mismo orden que la explicación:
+Un explorador de bloques con herramientas de seguridad, organizado como una
+aplicación (encabezado, navegación lateral, inspector de detalle y barra de
+estado), no como una secuencia de pasos:
 
-1. **Curva elíptica**: una curva pequeña sobre F_p dibujada punto a punto. Se elige
-   P y Q para ver P + Q (secante, tangente o inverso, con el cálculo de λ), o k·P
-   con la traza de double-and-add.
-2. **Firmas ECDSA**: firma un mensaje y muestra z, k, R, r, s y la verificación
-   (w, u₁, u₂, X). Con k fijo, dos firmas comparten r y la página recupera la clave.
-3. **Cadena**: bloques enlazados, árbol de Merkle con prueba de inclusión,
-   billeteras, mempool, transferencias y minado con dificultad ajustable.
-4. **Validador**: manipula una copia de la cadena (monto, destinatario, firma,
-   re-minado, dificultad, enlace) y muestra qué detecta. También valida un JSON pegado.
-5. **Ataque**: recolecta las firmas públicas, resalta los r repetidos, despeja k y d
-   con los números reales y roba los fondos. El validador acepta el robo.
-6. **Defensa**: compara la misma simulación con RNG defectuoso y con RFC 6979, y
-   permite aplicar la defensa a la red.
+| Sección | Qué hay |
+|---|---|
+| **Red · Resumen** | Métricas de la red, últimos bloques y transacciones, integridad y alertas de seguridad. |
+| **Red · Bloques** | Tabla de bloques e inspector con encabezado, transacciones, árbol de Merkle y prueba de inclusión. |
+| **Red · Transacciones** | Confirmadas y pendientes; cada una con su firma (r, s), el mensaje firmado y su prueba Merkle. |
+| **Red · Billeteras** | Saldos, claves públicas, historial y la estrategia de nonce de cada billetera (editable). |
+| **Seguridad · Integridad** | Validación de la cadena real, simulación de manipulaciones sobre una copia y validación de un JSON importado. |
+| **Seguridad · Análisis de firmas** | Detecta r repetidos, despeja k y d con los números reales y permite explotar la clave; compara RNG defectuoso contra RFC 6979. |
+| **Laboratorio · Curva elíptica** | Curva pequeña sobre F_p: suma de puntos (con λ) y k·P con la traza de double-and-add. |
+| **Laboratorio · ECDSA** | Firma con todos los valores intermedios; con k fijo detecta el r repetido y recupera la clave. |
+| **Escenario** | Semilla, dificultad, tamaño de la red y la estrategia de nonce de Bob. |
+
+El análisis de firmas corre solo cada vez que cambia la cadena: si una clave
+queda expuesta aparece una alerta en el Resumen, en la navegación y en la barra
+de estado. Transferir y minar están en el encabezado y sirven desde cualquier
+pantalla; la búsqueda global (`Ctrl K`) encuentra bloques, transacciones y
+billeteras.
+
+**Recorrido sugerido para exponer**: Resumen (la alerta) → Laboratorio · Curva →
+Laboratorio · ECDSA → Bloques → Integridad → Análisis de firmas (explotar y
+comparar estrategias) → Escenario (regenerar con RFC 6979).
 
 Varios navegadores pueden conectarse a la vez: comparten la red, cada uno elige
-con qué billetera actuar y los cambios llegan en tiempo real por WebSocket.
+con qué billetera firma y los cambios llegan en tiempo real por WebSocket.
 
 ## Estructura
 

@@ -2,8 +2,9 @@
 // si cambias de backend (otro host, otro puerto), solo cambia VITE_API_URL.
 import type {
   AttackScan, BlockDetail, CurveAdd, CurveMul, CurvePoints, DefenseStats, MerkleProof,
-  MineResult, NetworkState, NonceKind, Pt, RecoverResult, ScenarioParams, Secp256k1Info,
-  SignResult, StealResult, TamperResult, Tx, ValidationResult, VerifySteps, Wallet,
+  MineResult, NetworkState, NonceKind, Pt, RecoverResult, ScenarioParams, SearchResult, Secp256k1Info,
+  SignResult, StealResult, TamperResult, Tx, TxDetail, TxRow, ValidationResult, VerifySteps, Wallet,
+  WalletDetail,
 } from "./types";
 
 const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
@@ -46,6 +47,11 @@ export const api = {
   block: (i: number) => get<BlockDetail>(`/api/blocks/${i}`),
   proof: (i: number, tx: number) => get<MerkleProof>(`/api/blocks/${i}/proof/${tx}`),
   exportChain: () => get<unknown>("/api/chain/export"),
+  search: (q: string) => get<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  transactions: (address?: string) =>
+    get<TxRow[]>(`/api/transactions${address ? `?address=${encodeURIComponent(address)}` : ""}`),
+  transaction: (txid: string) => get<TxDetail>(`/api/transactions/${txid}`),
+  wallet: (name: string) => get<WalletDetail>(`/api/wallets/${encodeURIComponent(name)}`),
   // billeteras y transacciones
   createWallet: (name: string, nonce: NonceKind) => post<Wallet>("/api/wallets", { name, nonce }),
   setNonce: (name: string, nonce: NonceKind) =>

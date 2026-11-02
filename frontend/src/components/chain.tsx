@@ -44,7 +44,7 @@ export function ChainStrip({ blocks, selected, onSelect }: {
               <div className="bline"><span>hash</span><code className="mono">{shortHex(b.hash, 5)}</code></div>
               <div className="bline"><span>prev</span><code className="mono">{shortHex(b.prev_hash, 5)}</code></div>
               {b.nonce !== undefined && (
-                <div className="bline"><span>nonce · bits</span><span className="num">{b.nonce} · {b.difficulty}</span></div>
+                <div className="bline"><span>nonce</span><span className="num">{b.nonce.toLocaleString("es")}</span></div>
               )}
             </button>
           </Fragment>
@@ -117,7 +117,7 @@ export function MerkleTree({ levels, leafLabels, highlightLeaf }: {
           const isRoot = l === levels.length - 1;
           return (
             <g key={key}>
-              <rect x={xs[l][i] - nodeW / 2} y={y(l) - 12} width={nodeW} height={24} rx={6}
+              <rect x={xs[l][i] - nodeW / 2} y={y(l) - 12} width={nodeW} height={24}
                 fill={fill} stroke={stroke} />
               <text x={xs[l][i]} y={y(l) + 4} textAnchor="middle" className="label"
                 style={{ fill: "var(--text)", fontSize: 10 }}>

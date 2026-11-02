@@ -228,3 +228,25 @@ export interface RecoverResult {
   d: string;
   matches_pubkey: boolean | null;
 }
+
+export interface TxRow extends Tx {
+  block: number | null;
+  position: number | null;
+  timestamp: number | null;
+}
+
+export interface TxDetail extends TxRow {
+  proof: MerkleProof | null;
+}
+
+export interface WalletDetail extends Wallet {
+  history: TxRow[];
+  signatures: number;
+}
+
+export interface SearchResult {
+  type: "block" | "tx" | "wallet";
+  ref: string;
+  label: string;
+  detail: string;
+}

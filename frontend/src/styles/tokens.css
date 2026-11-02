@@ -1,13 +1,11 @@
 /*
  * Tokens de diseño. Dos capas (como Primer de GitHub):
  *   1. Primitivos: escalas de 12 pasos de Radix Colors (claro y oscuro).
- *   2. Semánticos: lo que usan los componentes (--bg, --text, --accent...).
- * Los componentes nunca usan un primitivo directamente, así que cambiar la
- * paleta o añadir un tema solo toca este archivo. Ver docs/DISENO.md.
+ *   2. Semánticos: lo que usan los componentes (--layer-1, --text, --accent...).
+ * Los componentes nunca usan un primitivo directamente. Ver docs/DISENO.md.
  *
- * Uso de los pasos de Radix:
- *   1-2 fondos · 3-5 fondos de componentes (normal/hover/activo)
- *   6-8 bordes · 9-10 color sólido · 11 texto suave · 12 texto fuerte
+ * Geometría inspirada en Carbon (IBM): esquinas rectas, profundidad por capas
+ * de superficie en lugar de sombras, y rejilla de 8 px.
  */
 @import "@radix-ui/colors/slate.css";
 @import "@radix-ui/colors/slate-dark.css";
@@ -21,89 +19,101 @@
 @import "@radix-ui/colors/amber-dark.css";
 
 :root {
-  /* Superficies */
-  --bg: var(--slate-1);
-  --bg-subtle: var(--slate-2);
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-hover: var(--slate-3);
-  --surface-active: var(--slate-4);
+  /* Capas: el lienzo es la más baja; cada panel sube un nivel. */
+  --canvas: var(--slate-2);
+  --layer-1: #ffffff;
+  --layer-2: var(--slate-2);
+  --layer-hover: var(--slate-3);
+  --layer-active: var(--slate-4);
+  --layer-selected: var(--iris-3);
   --border-subtle: var(--slate-4);
   --border: var(--slate-6);
   --border-strong: var(--slate-8);
+
+  /* Encabezado de la aplicación: oscuro en ambos temas (como el shell g100 de Carbon). */
+  --header-bg: #18191b;
+  --header-text: #edeef0;
+  --header-muted: #9ba1a6;
+  --header-hover: #272a2d;
+  --header-border: #2e3135;
 
   /* Texto */
   --text: var(--slate-12);
   --text-muted: var(--slate-11);
   --text-faint: var(--slate-9);
 
-  /* Acento (iris): acciones principales y selección */
+  /* Acento (iris): acción principal, selección, foco */
   --accent: var(--iris-9);
   --accent-hover: var(--iris-10);
   --accent-contrast: #ffffff;
   --accent-text: var(--iris-11);
   --accent-soft: var(--iris-3);
-  --accent-soft-hover: var(--iris-4);
-  --accent-border: var(--iris-7);
+  --accent-border: var(--iris-8);
+  --focus: var(--iris-9);
 
-  /* Estados: válido / defensa (jade), inválido / ataque (ruby), PoW / aviso (amber) */
+  /* Estados: válido (jade), crítico / ataque (ruby), aviso / PoW (amber) */
   --ok: var(--jade-9);
-  --ok-text: var(--jade-11);          /* sobre fondo neutro: 4.66:1 */
+  --ok-text: var(--jade-11);          /* sobre capa neutra: 4.66:1 */
   --ok-on-soft: var(--jade-12);       /* sobre --ok-soft: 10.97:1 */
   --ok-soft: var(--jade-3);
-  --ok-border: var(--jade-7);
+  --ok-border: var(--jade-8);
   --bad: var(--ruby-9);
-  --bad-solid: var(--ruby-11);        /* fondo de botón con texto blanco: 5.43:1 */
+  --bad-solid: var(--ruby-11);        /* botón con texto blanco: 5.43:1 */
   --bad-solid-hover: var(--ruby-12);
   --bad-text: var(--ruby-11);
   --bad-on-soft: var(--ruby-11);      /* 4.70:1 */
   --bad-soft: var(--ruby-3);
-  --bad-border: var(--ruby-7);
+  --bad-border: var(--ruby-8);
   --warn: var(--amber-9);
   --warn-text: var(--amber-11);
   --warn-on-soft: var(--amber-12);    /* 10.47:1 */
   --warn-soft: var(--amber-3);
-  --warn-border: var(--amber-7);
+  --warn-border: var(--amber-8);
 
   /* Tipografía */
   --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
+  --text-2xs: 0.6875rem;  /* 11 */
+  --text-xs: 0.75rem;     /* 12 */
+  --text-sm: 0.8125rem;   /* 13 */
+  --text-base: 0.875rem;  /* 14 */
+  --text-lg: 1rem;        /* 16 */
+  --text-xl: 1.25rem;     /* 20 */
+  --text-2xl: 1.75rem;    /* 28 */
 
-  /* Espaciado (base 4px) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-7: 48px;
-  --space-8: 64px;
+  /* Rejilla de 8 px (con medio paso de 4) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
 
-  /* Forma y profundidad */
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
-  --shadow: 0 1px 3px rgb(16 24 40 / 0.06), 0 4px 12px rgb(16 24 40 / 0.04);
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--iris-8);
+  /* Medidas del shell y de los controles (Carbon: fila md = 40, sm = 32) */
+  --header-h: 48px;
+  --status-h: 26px;
+  --nav-w: 232px;
+  --nav-w-collapsed: 48px;
+  --control-h: 32px;
+  --row-h: 36px;
+  --inspector-w: 440px;
 
-  --sidebar-width: 248px;
+  --radius: 0;
   color-scheme: light;
 }
 
 :root.dark {
-  --surface: var(--slate-2);
-  --surface-raised: var(--slate-3);
-  --surface-hover: var(--slate-4);
-  --surface-active: var(--slate-5);
-  --shadow-sm: none;
-  --shadow: 0 0 0 1px rgb(255 255 255 / 0.02);
+  --canvas: var(--slate-1);
+  --layer-1: var(--slate-2);
+  --layer-2: var(--slate-3);
+  --layer-hover: var(--slate-4);
+  --layer-active: var(--slate-5);
+  --layer-selected: var(--iris-3);
+  --border-subtle: var(--slate-4);
+  --border: var(--slate-6);
+  --header-bg: #111113;
+  --header-border: #212225;
   --ok-on-soft: var(--jade-11);       /* 7.96:1 */
   --warn-on-soft: var(--amber-11);
   --bad-on-soft: var(--ruby-11);      /* 7.68:1 */

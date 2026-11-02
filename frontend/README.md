@@ -14,10 +14,12 @@ npm run typecheck
 |---|---|
 | `src/api.ts` | Único punto de contacto con la API |
 | `src/types.ts` | Tipos de las respuestas |
-| `src/store.tsx` | Estado de la red + WebSocket de eventos con reconexión |
-| `src/styles/tokens.css` | Tokens de diseño (Radix Colors, Inter, JetBrains Mono) |
-| `src/components/` | Componentes base y visualizaciones (cadena, árbol de Merkle) |
-| `src/pages/` | Una página por paso del recorrido |
+| `src/store.tsx` | Estado de la red, WebSocket con reconexión, identidad activa, alertas y diálogos |
+| `src/router.ts` | Rutas por hash con parámetros (`#/bloques?b=3`) |
+| `src/styles/tokens.css` | Tokens de diseño (Radix Colors, capas, esquinas rectas) |
+| `src/components/shell.tsx` | Encabezado, búsqueda global, navegación lateral y barra de estado |
+| `src/components/` | Componentes base, diálogos y visualizaciones (cadena, árbol de Merkle) |
+| `src/pages/` | Una página por sección de la navegación |
 
 Cómo encaja con la simulación: [../docs/CONECTAR_UI.md](../docs/CONECTAR_UI.md).
 Decisiones de diseño: [../docs/DISENO.md](../docs/DISENO.md).
