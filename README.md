@@ -103,15 +103,23 @@ docs/           cómo conectar la UI, despliegue y sistema de diseño
 | `minichain/simulation.py` | | Escenario con datos simulados |
 | `minichain/demo.py` | | Demo narrada en la terminal |
 
-Documentación adicional:
+## Documentación
 
-- [docs/CONECTAR_UI.md](docs/CONECTAR_UI.md): cómo fluye una acción de la UI a la
-  simulación, la API, y cómo agregar funcionalidades.
-- [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md): red local, Docker, proxy inverso y
-  cómo escalar a muchos clientes.
-- [docs/DISENO.md](docs/DISENO.md): paleta, tipografía y la investigación detrás.
-- Con el servidor encendido, la referencia interactiva de la API está en
-  http://localhost:8000/api/docs.
+La carpeta [docs/](docs/README.md) explica el proyecto desde cero, sin suponer
+conocimientos previos. Orden de lectura sugerido:
+
+1. [El proyecto en general](docs/01-proyecto.md): qué demuestra, sus partes y los personajes de la simulación.
+2. [Blockchain](docs/02-blockchain.md): transacciones, bloques, hash, Merkle, minado y validación.
+3. [Criptografía](docs/03-criptografia.md): hashes, aritmética modular, curvas elípticas y ECDSA, con un ejemplo con números pequeños.
+4. [La vulnerabilidad](docs/04-vulnerabilidad.md): por qué repetir el nonce entrega la clave privada, paso a paso, y la defensa.
+5. [El código](docs/05-codigo.md): qué hace cada archivo.
+6. [La interfaz](docs/06-interfaz.md): el propósito de cada sección y cada página.
+7. [Guion para exponer](docs/07-guion-exposicion.md): recorrido de la demostración en vivo y preguntas frecuentes.
+
+Además: el [glosario](docs/glosario.md), [cómo conectar la UI con la
+simulación](docs/CONECTAR_UI.md), el [despliegue](docs/DESPLIEGUE.md) y el
+[sistema de diseño](docs/DISENO.md). Con el servidor encendido, la referencia
+interactiva de la API está en http://localhost:8000/api/docs.
 
 ## La matemática
 
