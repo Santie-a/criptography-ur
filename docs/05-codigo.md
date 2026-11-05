@@ -226,6 +226,7 @@ interfaz y otros clientes. No contiene criptografía propia: todo lo calcula
 | `network.py` | El estado compartido: un `Node`, las billeteras y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
 | `labs.py` | Los laboratorios: curva pequeña (puntos, suma, k·P con traza) y ECDSA paso a paso (firmar, verificar, recuperar). No guardan estado. |
 | `events.py` | El canal de eventos en tiempo real: avisa a todos los navegadores cuando algo cambia. |
+| `security.py` | Los roles: comprueba el token de administrador (`MINICHAIN_ADMIN_TOKEN`) en las rutas que controlan la simulación, y limita las escrituras públicas por IP. Ver [Roles](CONECTAR_UI.md#roles). |
 | `storage.py` | Dónde se guarda la red: en memoria, en un archivo JSON o en PostgreSQL (Supabase). El servidor guarda tras cada cambio y restaura al arrancar. Ver [Despliegue](DESPLIEGUE.md#persistencia-dónde-se-guarda-la-red). |
 
 La lista de rutas está en [Conectar la UI](CONECTAR_UI.md#endpoints) y, con el
@@ -247,7 +248,8 @@ criptografía.
 | `src/types.ts` | La forma de los datos que devuelve el servidor. |
 | `src/store.tsx` | El estado global: datos de la red, conexión en tiempo real, billetera con la que firma este navegador, alertas de seguridad y diálogos abiertos. |
 | `src/components/shell.tsx` | Encabezado, búsqueda global, navegación lateral y barra de estado. |
-| `src/components/dialogs.tsx` | Los diálogos de transferir, minar y crear billetera. |
+| `src/components/dialogs.tsx` | Los diálogos de transferir, minar, crear billetera e ingresar como administrador. |
+| `src/components/admin.tsx` | El aviso "Requiere administrador" que reemplaza las acciones restringidas. |
 | `src/components/ui.tsx` | Componentes base: paneles, tablas, pestañas, botones, etiquetas, avisos… |
 | `src/components/chain.tsx` | Visualizaciones: la tira de bloques enlazados y el árbol de Merkle. |
 | `src/pages/*.tsx` | Una página por sección. Se describen en [6. La interfaz](06-interfaz.md). |
@@ -258,7 +260,7 @@ criptografía.
 
 ## 5.5 Las pruebas: `tests/`
 
-Se ejecutan con `python -m pytest`. Son 57 (una de ellas, la de PostgreSQL, solo corre si se define `MINICHAIN_TEST_DATABASE_URL`).
+Se ejecutan con `python -m pytest`. Son 71 (una de ellas, la de PostgreSQL, solo corre si se define `MINICHAIN_TEST_DATABASE_URL`).
 
 | Archivo | Qué comprueba |
 |---|---|
@@ -267,6 +269,7 @@ Se ejecutan con `python -m pytest`. Son 57 (una de ellas, la de PostgreSQL, solo
 | `test_chain.py` | Merkle (raíz calculada a mano y pruebas de inclusión para cada hoja); minado; que una cadena honesta es válida; que se detecta cada tipo de manipulación; que se rechaza gastar de más, repetir transacciones y suplantar firmas; mempool; exportar e importar. |
 | `test_attack.py` | Las fórmulas recuperan k y d; funcionan con firmas low-s; el ataque sobre la cadena simulada recupera exactamente la clave de Bob y el robo pasa la validación; con RFC 6979 no se recupera nada. |
 | `test_server.py` | El flujo completo por la API: estado, bloques, transferir, minar, cliente con clave propia, manipulación sin afectar la red, ataque, defensa, laboratorios, búsqueda y eventos en tiempo real. |
+| `test_auth.py` | Que cada ruta de administrador rechaza peticiones sin token o con un token incorrecto y las acepta con el correcto; que el público puede leer todo y enviar transacciones firmadas con su propia clave, pero no gastar dinero ajeno; el límite de peticiones; y el modo abierto. |
 | `test_storage.py` | Que la red se guarda y se restaura igual (bloques, mempool, billeteras, versión y el generador de Bob), que un estado guardado alterado se rechaza, que una caída de la base de datos no rompe la red ni sobrescribe lo guardado, y que la validación incremental y el análisis cacheado dan lo mismo que el cálculo completo. Incluye una prueba contra PostgreSQL real. |
 
 ---

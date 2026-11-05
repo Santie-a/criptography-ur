@@ -3,6 +3,7 @@
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { AdminRequired } from "../components/admin";
 import { AsyncButton, Notice, PageHeader, Panel } from "../components/ui";
 import { useStore } from "../store";
 import type { NonceKind, ScenarioParams } from "../types";
@@ -20,7 +21,7 @@ function Row({ title, desc, children }: { title: string; desc: ReactNode; childr
 }
 
 export function Scenario() {
-  const { state, setState, run, notify } = useStore();
+  const { state, setState, run, notify, isAdmin } = useStore();
   const [form, setForm] = useState<ScenarioParams | null>(null);
   useEffect(() => {
     if (state && !form) setForm(state.params);
@@ -36,6 +37,8 @@ export function Scenario() {
       <PageHeader crumbs={[{ label: "Configuración" }, { label: "Escenario" }]} title="Escenario de simulación"
         sub="Los datos se generan a partir de una semilla: la misma configuración produce la misma red." />
       <div className="page-body" style={{ maxWidth: 920 }}>
+        {!isAdmin && <AdminRequired>Puedes ver la configuración actual; cambiarla y regenerar la red es del administrador.</AdminRequired>}
+        <fieldset disabled={!isAdmin} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--s-4)" }}>
         <Panel title="Red">
           <Row title="Semilla" desc="Determina claves, montos y destinatarios. Solo los nonces aleatorios de Carol no dependen de ella.">
             <input className="input num" type="number" value={form.seed} onChange={(e) => set("seed", Number(e.target.value))} />
@@ -63,14 +66,15 @@ export function Scenario() {
             </Row>
           )}
         </Panel>
+        </fieldset>
 
-        <Notice tone="warn" title="Regenerar reemplaza la red para todos los clientes conectados"
+        {isAdmin && <Notice tone="warn" title="Regenerar reemplaza la red para todos los clientes conectados"
           actions={<AsyncButton variant="danger" icon={<RotateCcw size={14} />} onRun={async () => {
             const s = await run(() => api.reset(form));
             if (s) { setState(s); setForm(s.params); notify("Red regenerada"); }
           }}>{dirty ? "Aplicar y regenerar" : "Regenerar"}</AsyncButton>}>
           Se pierden los bloques, transacciones y billeteras creadas desde la última generación.
-        </Notice>
+        </Notice>}
       </div>
     </>
   );

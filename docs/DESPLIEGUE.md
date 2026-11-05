@@ -124,6 +124,7 @@ No hace falta crear tablas: el servidor las crea al arrancar.
    | Variable | Valor |
    |---|---|
    | `DATABASE_URL` | La cadena del paso 1. Márcala como secreta. |
+   | `MINICHAIN_ADMIN_TOKEN` | Un valor largo y aleatorio, por ejemplo el que imprime `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Márcalo como secreto. **Sin esta variable, cualquiera con la URL controla la red.** |
    | `MINICHAIN_CORS` | vacío (la UI se sirve desde el mismo dominio) |
    | `MINICHAIN_MAX_DIFFICULTY` | `18` (la CPU gratuita es lenta) |
 
@@ -132,7 +133,9 @@ No hace falta crear tablas: el servidor las crea al arrancar.
    y la imagen). Al terminar, la aplicación queda en
    `https://<nombre>.onrender.com`.
 5. Comprueba `https://<nombre>.onrender.com/api/health`. Debe decir
-   `"storage": {"kind": "postgres", "ok": true, ...}`.
+   `"storage": {"kind": "postgres", "ok": true, ...}` y `"auth": {"required": true, ...}`.
+6. Abre la aplicación, pulsa **Administrar** en el encabezado e ingresa el token.
+   Debe aparecer "Administrador" y los botones Transferir y Minar.
 
 ### Paso 3. Comprobar que la red sobrevive reinicios
 
@@ -157,9 +160,10 @@ En Supabase, *Table Editor → esquema `minichain`* muestra los bloques guardado
 1. **Un solo proceso.** El estado se valida en memoria; el servidor corre con un
    solo *worker*. Para varias instancias habría que reemplazar `EventBus` por uno
    sobre Redis y coordinar la escritura de bloques.
-2. **Todavía no hay roles.** Cualquiera con la URL puede regenerar la red, firmar
-   con las billeteras de la demostración o lanzar el ataque. Es lo próximo a
-   resolver (etapa 2: token de administrador).
+2. **Roles.** Sin token se puede leer todo y enviar transacciones firmadas con una
+   clave propia; todo lo demás requiere `MINICHAIN_ADMIN_TOKEN`. Detalle en
+   [Roles](CONECTAR_UI.md#roles). Las escrituras públicas tienen un límite por IP
+   (`MINICHAIN_RATE_LIMIT`).
 3. **El minado y la verificación ocupan CPU.** `MINICHAIN_MAX_DIFFICULTY` limita la
    dificultad por bloque. La validación de la cadena y el análisis de firmas se
    calculan una vez por bloque nuevo y se comparten entre todos los clientes.

@@ -15,12 +15,40 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+// Token del administrador. Se recuerda en este navegador (el PC de quien
+// expone); los participantes no lo necesitan.
+const TOKEN_KEY = "minichain-admin-token";
+let adminToken: string | null = (() => {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+})();
+
+export function getAdminToken(): string | null {
+  return adminToken;
+}
+
+export function setAdminToken(token: string | null): void {
+  adminToken = token;
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* almacenamiento no disponible: el token dura lo que dure la pestaña */
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown, token = adminToken): Promise<T> {
   let res: Response;
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (token) headers.Authorization = `Bearer ${token}`;
   try {
     res = await fetch(`${BASE}${path}`, {
       method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -43,6 +71,8 @@ const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
 export const api = {
   // red
   state: () => get<NetworkState>("/api/state"),
+  /** Comprueba un token sin guardarlo. */
+  checkAdmin: (token: string) => request<{ ok: boolean }>("GET", "/api/admin/check", undefined, token),
   reset: (params: Partial<ScenarioParams>) => post<NetworkState>("/api/reset", params),
   block: (i: number) => get<BlockDetail>(`/api/blocks/${i}`),
   proof: (i: number, tx: number) => get<MerkleProof>(`/api/blocks/${i}/proof/${tx}`),

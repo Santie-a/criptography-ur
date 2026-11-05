@@ -7,7 +7,7 @@ import { useStore } from "../store";
 import type { NonceKind, WalletDetail } from "../types";
 
 export function Wallets() {
-  const { state, scan, identity, setIdentity, run, notify, openDialog } = useStore();
+  const { state, scan, identity, setIdentity, run, notify, openDialog, isAdmin } = useStore();
   const { params } = useRoute();
   const selected = params.get("w") ?? identity;
   const [detail, setDetail] = useState<WalletDetail | null>(null);
@@ -23,7 +23,7 @@ export function Wallets() {
     <>
       <PageHeader crumbs={[{ label: "Red", href: href("resumen") }, { label: "Billeteras" }]} title="Billeteras"
         sub="Las billeteras de la simulación las custodia el servidor; cada navegador elige con cuál firma."
-        actions={<Button variant="primary" icon={<Plus size={14} />} onClick={() => openDialog("wallet")}>Nueva billetera</Button>} />
+        actions={isAdmin && <Button variant="primary" icon={<Plus size={14} />} onClick={() => openDialog("wallet")}>Nueva billetera</Button>} />
       <div className="list-detail">
         <div className="list">
           <Panel flush>
@@ -35,7 +35,7 @@ export function Wallets() {
                     <tr key={w.name} className={`clickable ${w.name === selected ? "selected" : ""}`} onClick={() => go("billeteras", { w: w.name })}>
                       <td>
                         <span className="row-nowrap"><span className="avatar" style={{ width: 20, height: 20, fontSize: 9 }}>{initials(w.name)}</span><strong>{w.name}</strong>
-                          {w.name === identity && <Tag tone="accent">tú</Tag>}</span>
+                          {isAdmin && w.name === identity && <Tag tone="accent">tú</Tag>}</span>
                       </td>
                       <td><Hex value={w.address} n={6} /></td>
                       <td className="right num">{w.balance}</td>
@@ -52,7 +52,7 @@ export function Wallets() {
         </div>
 
         {detail && (
-          <Inspector title={detail.name} actions={detail.name !== identity && (
+          <Inspector title={detail.name} actions={isAdmin && detail.name !== identity && (
             <Button size="sm" icon={<UserCheck size={12} />} onClick={() => { setIdentity(detail.name); notify(`Ahora firmas como ${detail.name}`); }}>Usar</Button>
           )}>
             {exposed.has(detail.address) && (
@@ -76,13 +76,19 @@ export function Wallets() {
               </dl>
             </Section>
             <Section title="Generación del nonce k">
-              <select className="select" value={detail.nonce} onChange={async (e) => {
-                const w = await run(() => api.setNonce(detail.name, e.target.value as NonceKind));
-                if (w) notify(`${detail.name} firmará con: ${w.nonce_label}`);
-              }}>
-                {Object.entries(state.nonce_kinds).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </select>
-              <span className="xs muted">Cambiarla solo afecta firmas futuras: las ya publicadas siguen en la cadena.</span>
+              {isAdmin ? (
+                <>
+                  <select className="select" value={detail.nonce} onChange={async (e) => {
+                    const w = await run(() => api.setNonce(detail.name, e.target.value as NonceKind));
+                    if (w) notify(`${detail.name} firmará con: ${w.nonce_label}`);
+                  }}>
+                    {Object.entries(state.nonce_kinds).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                  </select>
+                  <span className="xs muted">Cambiarla solo afecta firmas futuras: las ya publicadas siguen en la cadena.</span>
+                </>
+              ) : (
+                <div className="row"><NonceTag kind={detail.nonce} /><span className="small muted">{detail.nonce_label}</span></div>
+              )}
             </Section>
             <Section title={`Historial (${detail.history.length})`}>
               <div style={{ margin: "0 -16px" }}>

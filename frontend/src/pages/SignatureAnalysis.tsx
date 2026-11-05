@@ -3,6 +3,7 @@
 import { Crosshair, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api";
+import { AdminRequired } from "../components/admin";
 import { AsyncButton, Button, Empty, Field, Hex, Inspector, Metrics, Notice, PageHeader, Panel, Section, Tabs, Tag } from "../components/ui";
 import { go, href, useRoute } from "../router";
 import { useStore } from "../store";
@@ -93,7 +94,7 @@ function NonceReuse() {
 }
 
 function RecoveryInspector({ rec }: { rec: Recovery }) {
-  const { state, run, notify } = useStore();
+  const { state, run, notify, isAdmin } = useStore();
   const [thief, setThief] = useState("Mallory");
   const [result, setResult] = useState<StealResult | null>(null);
   const targets = state?.wallets.filter((w) => w.name !== rec.name) ?? [];
@@ -152,15 +153,24 @@ function RecoveryInspector({ rec }: { rec: Recovery }) {
         <span className="small muted">
           Firma una transferencia de todo el saldo disponible ({victim?.available ?? "—"}) con la clave recuperada. La red la acepta: la firma es válida.
         </span>
-        <Field label="Destino de los fondos">
-          <select className="select" value={thief} onChange={(e) => setThief(e.target.value)}>
-            {targets.map((w) => <option key={w.name} value={w.name}>{w.name}</option>)}
-          </select>
-        </Field>
-        <AsyncButton variant="danger" icon={<Crosshair size={14} />} disabled={!victim?.available} onRun={async () => {
-          const r = await run(() => api.steal(rec.name ?? rec.address, thief));
-          if (r) { setResult(r); notify(`Transferencia falsificada incluida en el bloque #${r.mined.block.index}`); }
-        }}>Firmar como {rec.name ?? "la víctima"} y minar</AsyncButton>
+        {isAdmin ? (
+          <>
+            <Field label="Destino de los fondos">
+              <select className="select" value={thief} onChange={(e) => setThief(e.target.value)}>
+                {targets.map((w) => <option key={w.name} value={w.name}>{w.name}</option>)}
+              </select>
+            </Field>
+            <AsyncButton variant="danger" icon={<Crosshair size={14} />} disabled={!victim?.available} onRun={async () => {
+              const r = await run(() => api.steal(rec.name ?? rec.address, thief));
+              if (r) { setResult(r); notify(`Transferencia falsificada incluida en el bloque #${r.mined.block.index}`); }
+            }}>Firmar como {rec.name ?? "la víctima"} y minar</AsyncButton>
+          </>
+        ) : (
+          <AdminRequired>
+            En la red compartida, la explotación la ejecuta el administrador. La clave recuperada está arriba:
+            cualquiera puede calcularla, porque sale de datos públicos.
+          </AdminRequired>
+        )}
         {result && (
           <>
             <Notice tone="warn" title="La validación sigue pasando">
@@ -191,7 +201,7 @@ function RecoveryInspector({ rec }: { rec: Recovery }) {
 }
 
 function Strategies() {
-  const { state, run } = useStore();
+  const { state, run, isAdmin } = useStore();
   const [seed, setSeed] = useState(state?.params.seed ?? 2026);
   const [bits, setBits] = useState(state?.params.entropy_bits ?? 3);
   const [cmp, setCmp] = useState<Record<"weak" | "rfc6979", DefenseStats> | null>(null);
@@ -200,7 +210,7 @@ function Strategies() {
   return (
     <div className="grid-2" style={{ gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", alignItems: "start" }}>
       <Panel title="Misma simulación, distinto generador de k" actions={
-        <AsyncButton size="sm" variant="primary" onRun={async () => { const r = await run(() => api.compareDefense(seed, bits)); if (r) setCmp(r); }}>Ejecutar</AsyncButton>
+        isAdmin && <AsyncButton size="sm" variant="primary" onRun={async () => { const r = await run(() => api.compareDefense(seed, bits)); if (r) setCmp(r); }}>Ejecutar</AsyncButton>
       }>
         <div className="stack">
           <div className="grid-2">
@@ -227,7 +237,8 @@ function Strategies() {
                 </tbody>
               </table>
             </div>
-          ) : <span className="small muted">Genera dos cadenas idénticas salvo por cómo Bob elige k, y les aplica el mismo análisis.</span>}
+          ) : isAdmin ? <span className="small muted">Genera dos cadenas idénticas salvo por cómo Bob elige k, y les aplica el mismo análisis.</span>
+            : <AdminRequired>La comparación genera dos redes completas en el servidor; la ejecuta el administrador.</AdminRequired>}
         </div>
       </Panel>
 
@@ -254,7 +265,7 @@ function Strategies() {
         </Panel>
         <Notice tone="warn" title="Cambiar el generador no protege firmas viejas">
           Si una clave ya repitió un nonce en la cadena, está comprometida. Hay que mover los fondos a una clave nueva.
-          <div style={{ marginTop: 8 }}><Button size="sm" onClick={() => go("escenario")}>Configurar el escenario</Button></div>
+          {isAdmin && <div style={{ marginTop: 8 }}><Button size="sm" onClick={() => go("escenario")}>Configurar el escenario</Button></div>}
         </Notice>
       </div>
     </div>

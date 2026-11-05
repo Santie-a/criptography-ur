@@ -75,6 +75,8 @@ code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
 .header-btn:hover { background: var(--header-hover); }
 .header-btn.primary { background: var(--accent); }
 .header-btn.primary:hover { background: var(--accent-hover); }
+.header-btn.role-admin { color: var(--jade-9); }
+.network-tag.warn-tag { color: var(--amber-9); border-color: #5c3d05; margin: 0 var(--s-2); }
 .header-sep { width: 1px; background: var(--header-border); margin: 0; }
 .brand { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-4) 0 var(--s-2); font-weight: 600; font-size: var(--text-base); white-space: nowrap; }
 .brand-mark { width: 22px; height: 22px; display: grid; place-items: center; background: var(--accent); color: #fff; }
@@ -233,6 +235,7 @@ button.nav-item { width: 100%; border: 0; background: transparent; font: inherit
 .textarea { height: auto; min-height: 72px; padding: var(--s-2) var(--s-3); resize: vertical; line-height: 1.5; }
 .input.mono, .textarea.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
 .input:focus, .select:focus, .textarea:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+.input:disabled, .select:disabled, .textarea:disabled { color: var(--text-muted); background: transparent; border-bottom-color: var(--border); cursor: not-allowed; }
 input[type="range"] { accent-color: var(--accent); width: 100%; }
 input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); }
 

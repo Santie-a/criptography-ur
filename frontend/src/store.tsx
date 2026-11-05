@@ -6,11 +6,11 @@
 //  - diálogos globales (nueva transacción, minar, nueva billetera)
 import { CheckCircle2, XCircle } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, eventsUrl } from "./api";
+import { api, ApiError, eventsUrl, getAdminToken, setAdminToken } from "./api";
 import type { AttackScan, NetworkState } from "./types";
 
 type Conn = "connecting" | "online" | "offline";
-export type DialogKind = "transfer" | "mine" | "wallet" | null;
+export type DialogKind = "transfer" | "mine" | "wallet" | "admin" | null;
 
 interface Toast {
   id: number;
@@ -29,6 +29,12 @@ interface Store {
   setIdentity: (name: string) => void;
   dialog: DialogKind;
   openDialog: (d: DialogKind) => void;
+  /** Este navegador puede usar las acciones de administrador. */
+  isAdmin: boolean;
+  /** El servidor exige token (false = modo abierto, desarrollo local). */
+  authRequired: boolean;
+  login: (token: string) => Promise<boolean>;
+  logout: () => void;
   refresh: () => Promise<void>;
   rescan: () => Promise<void>;
   setState: (s: NetworkState) => void;
@@ -84,10 +90,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       return await fn();
     } catch (e) {
+      // Token vencido o cambiado en el servidor: se olvida y se avisa.
+      if (e instanceof ApiError && e.status === 401 && getAdminToken()) {
+        setAdminToken(null);
+        refresh();
+        notify("La sesión de administrador ya no es válida. Vuelve a ingresar el token.", "bad");
+        return undefined;
+      }
       notify(e instanceof ApiError || e instanceof Error ? e.message : String(e), "bad");
       return undefined;
     }
-  }, [notify]);
+  }, [notify, refresh]);
+
+  const login = useCallback(async (token: string) => {
+    try {
+      await api.checkAdmin(token);
+    } catch (e) {
+      notify(e instanceof ApiError && e.status === 401 ? "Token incorrecto." : String(e), "bad");
+      return false;
+    }
+    setAdminToken(token);
+    await refresh();
+    notify("Sesión de administrador iniciada");
+    return true;
+  }, [notify, refresh]);
+
+  const logout = useCallback(() => {
+    setAdminToken(null);
+    setDialog(null);
+    refresh();
+    notify("Sesión de administrador cerrada");
+  }, [notify, refresh]);
+
+  const isAdmin = state?.auth?.admin ?? false;
+  const authRequired = state?.auth?.required ?? true;
 
   const setIdentity = useCallback((name: string) => {
     setIdentityRaw(name);
@@ -156,7 +192,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       state, error, conn, clients, updatedAt, scan, identity, setIdentity,
-      dialog, openDialog: setDialog, refresh, rescan, setState, notify, run,
+      dialog, openDialog: setDialog, isAdmin, authRequired, login, logout,
+      refresh, rescan, setState, notify, run,
     }}>
       {children}
       <div className="toast-stack" role="status" aria-live="polite">

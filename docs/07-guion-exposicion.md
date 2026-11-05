@@ -12,6 +12,9 @@ dice **qué abrir**, **qué hacer** y **qué decir**.
 
 - [ ] Compilar la interfaz una vez: `cd frontend && npm install && npm run build`.
 - [ ] Arrancar: `python -m server`. Abrir `http://localhost:8000`.
+- [ ] Si el servidor tiene `MINICHAIN_ADMIN_TOKEN` (siempre en la versión
+      publicada): pulsar **Administrar** en el encabezado e ingresar el token en el
+      PC desde el que se expone. Sin eso no aparecen Minar, Transferir ni Explotar.
 - [ ] Ir a **Escenario** y comprobar: semilla 2026, dificultad 14, Bob con **RNG
       defectuoso**, entropía 3. Pulsar **Regenerar** para partir de una red limpia.
 - [ ] Si el público se va a conectar desde sus celulares: arrancar con

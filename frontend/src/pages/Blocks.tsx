@@ -10,7 +10,7 @@ import { useStore } from "../store";
 import type { BlockDetail, MerkleProof } from "../types";
 
 export function Blocks() {
-  const { state, run, openDialog } = useStore();
+  const { state, run, openDialog, isAdmin } = useStore();
   const { params } = useRoute();
   const height = state?.height ?? 0;
   const selected = Math.min(Number(params.get("b") ?? height), height);
@@ -38,7 +38,7 @@ export function Blocks() {
     <>
       <PageHeader crumbs={[{ label: "Red", href: href("resumen") }, { label: "Bloques" }]} title="Bloques"
         sub={`${state.blocks.length} bloques · dificultad mínima ${state.difficulty} bits`}
-        actions={<Button variant="primary" icon={<Hammer size={14} />} onClick={() => openDialog("mine")}>Minar bloque</Button>} />
+        actions={isAdmin && <Button variant="primary" icon={<Hammer size={14} />} onClick={() => openDialog("mine")}>Minar bloque</Button>} />
       <div className="list-detail">
         <div className="list">
           <Panel title="Cadena" flush>

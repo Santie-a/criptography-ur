@@ -68,30 +68,55 @@ cambió*; los datos siempre se piden por HTTP. Así no hay dos fuentes de verdad
 La referencia completa, con esquemas y un botón para probar cada llamada, está en
 **http://localhost:8000/api/docs** con el servidor encendido.
 
-| Método | Ruta | Para qué |
+Rol: **público** = cualquiera con la URL; **admin** = requiere el token
+(`Authorization: Bearer <MINICHAIN_ADMIN_TOKEN>`, ver [Roles](#roles)); **límite** =
+público con límite de peticiones por IP.
+
+| Método | Ruta | Rol | Para qué |
+|---|---|---|---|
+| GET | `/api/health` | público | Estado del servidor, del almacenamiento y del rol de quien pregunta |
+| GET | `/api/state` | público | Billeteras, mempool, resumen de bloques, parámetros, rol |
+| GET | `/api/admin/check` | admin | Comprobar un token |
+| POST | `/api/reset` | admin | Regenerar el escenario (semilla, dificultad, nonce de Bob…) |
+| GET | `/api/search?q=` | público | Búsqueda global: bloque, txid, billetera o dirección |
+| GET | `/api/blocks/{i}` | público | Bloque con transacciones y niveles del árbol de Merkle |
+| GET | `/api/blocks/{i}/proof/{tx}` | público | Prueba de inclusión Merkle |
+| GET | `/api/chain/export` | público | Cadena completa en JSON |
+| GET | `/api/transactions` | público | Transacciones confirmadas (filtro opcional `?address=`) |
+| GET | `/api/transactions/{txid}` | público | Una transacción con su bloque y prueba Merkle |
+| GET | `/api/wallets/{nombre}` | público | Billetera con su historial |
+| POST | `/api/wallets` | admin | Crear una billetera custodiada por el servidor |
+| PUT | `/api/wallets/{nombre}/nonce` | admin | Cambiar su estrategia de nonce |
+| POST | `/api/transactions/transfer` | admin | El servidor firma con una billetera custodiada |
+| POST | `/api/transactions` | **límite** | Enviar una transacción firmada por el cliente: la firma es la autorización |
+| POST | `/api/mine` | admin | Minar un bloque con la mempool |
+| GET | `/api/validate` | público | Validar la cadena real (en caché) |
+| POST | `/api/tamper` | admin | Manipular una copia y validarla |
+| POST | `/api/validate/external` | admin | Validar una cadena en JSON |
+| GET | `/api/attack/scan` | público | Buscar r repetidos y recuperar claves (en caché) |
+| POST | `/api/attack/steal` | admin | Firmar como la víctima y minar |
+| POST | `/api/defense/compare` | admin | Comparar RNG defectuoso contra RFC 6979 |
+| GET/POST | `/api/lab/...` | límite | Curva de juguete, double-and-add, firma y verificación paso a paso |
+| WS | `/api/events` | público | Eventos `{type, version}`: `reset`, `wallet`, `mempool`, `block`, `presence` |
+
+### Roles
+
+| Rol | Quién | Qué puede hacer |
 |---|---|---|
-| GET | `/api/state` | Billeteras, mempool, resumen de bloques, parámetros |
-| POST | `/api/reset` | Regenerar el escenario (semilla, dificultad, nonce de Bob…) |
-| GET | `/api/search?q=` | Búsqueda global: bloque, txid, billetera o dirección |
-| GET | `/api/blocks/{i}` | Bloque con transacciones y niveles del árbol de Merkle |
-| GET | `/api/blocks/{i}/proof/{tx}` | Prueba de inclusión Merkle |
-| GET | `/api/chain/export` | Cadena completa en JSON |
-| GET | `/api/transactions` | Transacciones confirmadas (filtro opcional `?address=`) |
-| GET | `/api/transactions/{txid}` | Una transacción con su bloque y prueba Merkle |
-| GET | `/api/wallets/{nombre}` | Billetera con su historial |
-| POST | `/api/wallets` | Crear billetera |
-| PUT | `/api/wallets/{nombre}/nonce` | Cambiar su estrategia de nonce |
-| POST | `/api/transactions/transfer` | El servidor firma con una billetera suya |
-| POST | `/api/transactions` | Enviar una transacción firmada por el cliente |
-| POST | `/api/mine` | Minar un bloque con la mempool |
-| GET | `/api/validate` | Validar la cadena real |
-| POST | `/api/tamper` | Manipular una copia y validarla |
-| POST | `/api/validate/external` | Validar una cadena en JSON |
-| GET | `/api/attack/scan` | Buscar r repetidos y recuperar claves |
-| POST | `/api/attack/steal` | Firmar como la víctima y minar |
-| POST | `/api/defense/compare` | Comparar RNG defectuoso contra RFC 6979 |
-| GET/POST | `/api/lab/...` | Curva de juguete, double-and-add, firma y verificación paso a paso |
-| WS | `/api/events` | Eventos `{type, version}`: `reset`, `wallet`, `mempool`, `block`, `presence` |
+| **Público** | Cualquiera con la URL | Leer todo (la cadena es pública), usar los laboratorios y enviar transacciones **firmadas con su propia clave**. |
+| **Administrador** | Quien tiene `MINICHAIN_ADMIN_TOKEN` | Además: regenerar la red, firmar con las billeteras de la simulación (Alice, Bob…), minar, manipular copias de la cadena, validar archivos, comparar estrategias y ejecutar la explotación. |
+
+- Sin `MINICHAIN_ADMIN_TOKEN` el servidor está en **modo abierto**: todos son
+  administradores. Sirve para desarrollo local; en una URL pública hay que
+  definirlo siempre. El servidor lo advierte en el registro, y la interfaz muestra
+  "modo abierto" en el encabezado.
+- El token se compara en tiempo constante y viaja en el encabezado
+  `Authorization`, nunca en la URL.
+- El análisis de firmas, incluida la clave recuperada, es público a propósito:
+  cualquiera puede calcularla con los datos de la cadena, así que ocultarla en la
+  API no protegería nada.
+- Las escrituras públicas tienen un límite por IP (`MINICHAIN_RATE_LIMIT`, 60 por
+  minuto por defecto). El administrador no tiene límite.
 
 ## Usar la simulación sin la UI
 
@@ -154,6 +179,9 @@ Ejemplo: mostrar cuántos bits en cero tiene cada hash de bloque.
 | `PORT` o `MINICHAIN_PORT` | `8000` | Puerto del servidor (Render asigna `PORT`) |
 | `DATABASE_URL` | vacío | PostgreSQL donde se guarda la red (Supabase, *session pooler*) |
 | `MINICHAIN_STATE_FILE` | vacío | Alternativa local: guardar la red en un archivo JSON |
+| `MINICHAIN_ADMIN_TOKEN` | vacío | Token del administrador. Vacío = modo abierto (solo desarrollo) |
+| `MINICHAIN_RATE_LIMIT` | `60` | Escrituras públicas por minuto y por IP (0 = sin límite) |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxies de los que se acepta `X-Forwarded-For` (en el Dockerfile: `*`, para Render) |
 | `MINICHAIN_SEED` | `2026` | Semilla del escenario inicial |
 | `MINICHAIN_DIFFICULTY` | `14` | Dificultad inicial (bits) |
 | `MINICHAIN_MAX_DIFFICULTY` | `22` | Máximo por bloque, para que nadie bloquee el servidor |

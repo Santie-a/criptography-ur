@@ -4,7 +4,7 @@
 //   barra de estado: visibilidad del estado del sistema (heurística 1 de Nielsen)
 import {
   Blocks, Boxes, Coins, FileSignature, Hammer, LayoutDashboard, Menu, Moon, ScanSearch, Search,
-  Send, Settings2, ShieldCheck, Spline, Sun, Wallet,
+  Lock, Send, Settings2, ShieldCheck, Spline, Sun, Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { api } from "../api";
@@ -66,7 +66,7 @@ function useTheme(): [boolean, () => void] {
 }
 
 export function Header({ onToggleNav }: { onToggleNav: () => void }) {
-  const { state, identity, setIdentity, openDialog } = useStore();
+  const { state, identity, setIdentity, openDialog, isAdmin, authRequired } = useStore();
   const [dark, toggleTheme] = useTheme();
 
   return (
@@ -83,27 +83,45 @@ export function Header({ onToggleNav }: { onToggleNav: () => void }) {
       )}
       <GlobalSearch />
       <div className="header-right">
-        <button className="header-btn hide-sm" onClick={() => openDialog("transfer")} title="Nueva transacción">
-          <Send size={16} /><span className="label-text">Transferir</span>
-        </button>
-        <button className="header-btn" onClick={() => openDialog("mine")} title="Minar un bloque">
-          <Hammer size={16} /><span className="label-text">Minar</span>
-        </button>
-        <span className="header-sep hide-sm" />
-        <label className="identity" title="Billetera con la que firma este navegador">
-          <span className="avatar">{initials(identity)}</span>
-          <span className="sr-only">Actuar como</span>
-          <select value={identity} onChange={(e) => setIdentity(e.target.value)}>
-            {state?.wallets.map((w) => <option key={w.name} value={w.name}>{w.name}</option>)}
-          </select>
-        </label>
+        {isAdmin && (
+          <>
+            <button className="header-btn hide-sm" onClick={() => openDialog("transfer")} title="Nueva transacción">
+              <Send size={16} /><span className="label-text">Transferir</span>
+            </button>
+            <button className="header-btn" onClick={() => openDialog("mine")} title="Minar un bloque">
+              <Hammer size={16} /><span className="label-text">Minar</span>
+            </button>
+            <span className="header-sep hide-sm" />
+            <label className="identity" title="Billetera de la simulación con la que firmas">
+              <span className="avatar">{initials(identity)}</span>
+              <span className="sr-only">Actuar como</span>
+              <select value={identity} onChange={(e) => setIdentity(e.target.value)}>
+                {state?.wallets.map((w) => <option key={w.name} value={w.name}>{w.name}</option>)}
+              </select>
+            </label>
+            <span className="header-sep hide-sm" />
+          </>
+        )}
+        {authRequired ? (
+          <button className={`header-btn ${isAdmin ? "role-admin" : ""}`} onClick={() => openDialog("admin")}
+            title={isAdmin ? "Sesión de administrador activa" : "Ingresar como administrador"}>
+            {isAdmin ? <ShieldCheck size={16} /> : <Lock size={16} />}
+            <span className="label-text">{isAdmin ? "Administrador" : "Administrar"}</span>
+          </button>
+        ) : (
+          <span className="network-tag warn-tag" title="Sin MINICHAIN_ADMIN_TOKEN: cualquiera es administrador. Solo para desarrollo local.">
+            <span className="dot warn" /> modo abierto
+          </span>
+        )}
         <span className="header-sep hide-sm" />
         <button className="header-btn hide-sm" onClick={toggleTheme} aria-label={dark ? "Tema claro" : "Tema oscuro"} title={dark ? "Tema claro" : "Tema oscuro"}>
           {dark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-        <a className="header-btn hide-sm" href={href("escenario")} title="Configuración de la simulación" aria-label="Configuración">
-          <Settings2 size={16} />
-        </a>
+        {isAdmin && (
+          <a className="header-btn hide-sm" href={href("escenario")} title="Configuración de la simulación" aria-label="Configuración">
+            <Settings2 size={16} />
+          </a>
+        )}
       </div>
     </header>
   );
@@ -188,7 +206,7 @@ function GlobalSearch() {
 }
 
 export function SideNav({ current, onNavigate }: { current: string; onNavigate: () => void }) {
-  const { state, scan } = useStore();
+  const { state, scan, isAdmin } = useStore();
   const exposed = scan?.recoveries.length ?? 0;
   const counts: Record<string, { n: number; bad?: boolean } | undefined> = {
     bloques: state ? { n: state.blocks.length } : undefined,
@@ -217,9 +235,11 @@ export function SideNav({ current, onNavigate }: { current: string; onNavigate: 
         </div>
       ))}
       <div className="nav-group nav-bottom">
-        <a href={href("escenario")} onClick={onNavigate} title="Escenario" className={`nav-item ${section === "escenario" ? "active" : ""}`}>
-          <Settings2 size={16} /><span className="nav-label">Escenario</span>
-        </a>
+        {isAdmin && (
+          <a href={href("escenario")} onClick={onNavigate} title="Escenario" className={`nav-item ${section === "escenario" ? "active" : ""}`}>
+            <Settings2 size={16} /><span className="nav-label">Escenario</span>
+          </a>
+        )}
         <button type="button" className="nav-item" onClick={toggleTheme} title="Cambiar tema">
           {dark ? <Sun size={16} /> : <Moon size={16} />}<span className="nav-label">{dark ? "Tema claro" : "Tema oscuro"}</span>
         </button>
@@ -232,7 +252,7 @@ export function SideNav({ current, onNavigate }: { current: string; onNavigate: 
 }
 
 export function StatusBar() {
-  const { state, conn, clients, updatedAt, scan } = useStore();
+  const { state, conn, clients, updatedAt, scan, isAdmin, authRequired } = useStore();
   const exposed = scan?.recoveries.length ?? 0;
   return (
     <footer className="statusbar">
@@ -241,6 +261,7 @@ export function StatusBar() {
         {conn === "online" ? "Conectado" : conn === "offline" ? "Sin conexión" : "Conectando"}
       </span>
       {conn === "online" && <span className="hide-sm">{clients} {clients === 1 ? "cliente" : "clientes"}</span>}
+      {state && <span className="hide-sm">{!authRequired ? "Modo abierto" : isAdmin ? "Administrador" : "Solo lectura"}</span>}
       {state && (
         <>
           <span className="num">Altura {state.height}</span>

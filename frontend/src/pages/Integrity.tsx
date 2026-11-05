@@ -3,6 +3,7 @@
 import { Download, FileUp, FlaskConical, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { AdminRequired } from "../components/admin";
 import { ChainStrip } from "../components/chain";
 import { AsyncButton, Button, Field, Metrics, Notice, PageHeader, Panel, Tabs, Tag } from "../components/ui";
 import { href, useRoute } from "../router";
@@ -17,7 +18,7 @@ const KIND: Record<string, string> = {
 };
 
 export function Integrity() {
-  const { state } = useStore();
+  const { state, isAdmin } = useStore();
   const { params } = useRoute();
   const [mode, setMode] = useState<Mode>((params.get("modo") as Mode) || "actual");
   if (!state) return null;
@@ -33,8 +34,14 @@ export function Integrity() {
         ]} />} />
       <div className="page-body">
         {mode === "actual" && <Current />}
-        {mode === "simular" && <Simulate />}
-        {mode === "archivo" && <ImportFile />}
+        {mode !== "actual" && !isAdmin && (
+          <AdminRequired>
+            Simular manipulaciones y validar archivos recalcula la cadena completa en el servidor, así que en la red
+            compartida queda reservado al administrador. La validación de la cadena actual es pública.
+          </AdminRequired>
+        )}
+        {mode === "simular" && isAdmin && <Simulate />}
+        {mode === "archivo" && isAdmin && <ImportFile />}
       </div>
     </>
   );

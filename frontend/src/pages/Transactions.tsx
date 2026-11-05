@@ -7,7 +7,7 @@ import { useStore } from "../store";
 import type { TxDetail, TxRow } from "../types";
 
 export function Transactions() {
-  const { state, scan, run, openDialog } = useStore();
+  const { state, scan, run, openDialog, isAdmin } = useStore();
   const { params } = useRoute();
   const txid = params.get("tx");
   const [tab, setTab] = useState<"confirmadas" | "pendientes">("confirmadas");
@@ -38,7 +38,7 @@ export function Transactions() {
   return (
     <>
       <PageHeader crumbs={[{ label: "Red", href: href("resumen") }, { label: "Transacciones" }]} title="Transacciones"
-        actions={<Button variant="primary" icon={<Send size={14} />} onClick={() => openDialog("transfer")}>Nueva transacción</Button>}
+        actions={isAdmin && <Button variant="primary" icon={<Send size={14} />} onClick={() => openDialog("transfer")}>Nueva transacción</Button>}
         tabs={<Tabs value={tab} onChange={setTab} items={[
           { value: "confirmadas", label: `Confirmadas (${rows.length})` },
           { value: "pendientes", label: `Pendientes (${state.mempool.length})` },

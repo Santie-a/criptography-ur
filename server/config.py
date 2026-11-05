@@ -33,6 +33,11 @@ class Settings:
     # si no, MINICHAIN_STATE_FILE (un archivo JSON); si no, solo memoria.
     database_url: str | None = os.getenv("DATABASE_URL") or os.getenv("MINICHAIN_DATABASE_URL") or None
     state_file: str | None = os.getenv("MINICHAIN_STATE_FILE") or None
+    # Token del administrador. Sin él, el servidor está en modo abierto (todos
+    # son administradores): solo para desarrollo local.
+    admin_token: str | None = os.getenv("MINICHAIN_ADMIN_TOKEN") or None
+    # Peticiones públicas de escritura por minuto y por IP (0 = sin límite).
+    rate_limit: int = int(os.getenv("MINICHAIN_RATE_LIMIT", "60"))
 
 
 settings = Settings()

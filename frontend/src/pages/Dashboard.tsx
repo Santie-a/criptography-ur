@@ -11,7 +11,7 @@ import { useStore } from "../store";
 import type { TxRow, ValidationResult } from "../types";
 
 export function Dashboard() {
-  const { state, scan, openDialog } = useStore();
+  const { state, scan, openDialog, isAdmin } = useStore();
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [integrity, setIntegrity] = useState<ValidationResult | null>(null);
 
@@ -30,7 +30,7 @@ export function Dashboard() {
     <>
       <PageHeader crumbs={[{ label: "Red" }]} title="Resumen"
         sub={`Red simulada con ECDSA sobre secp256k1 · ${state.wallets.length} billeteras`}
-        actions={<>
+        actions={isAdmin && <>
           <Button icon={<Send size={14} />} onClick={() => openDialog("transfer")}>Nueva transacción</Button>
           <Button variant="primary" icon={<Hammer size={14} />} onClick={() => openDialog("mine")}>Minar bloque</Button>
         </>} />

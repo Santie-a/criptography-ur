@@ -67,6 +67,8 @@ export interface NetworkState {
   nonce_kinds: Record<NonceKind, string>;
   clients: number;
   storage: { kind: string; ok: boolean; error: string | null; restored: boolean };
+  /** required: el servidor exige token; admin: este navegador lo tiene. */
+  auth: { required: boolean; admin: boolean };
 }
 
 export interface MerkleProof {

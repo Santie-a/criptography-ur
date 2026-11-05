@@ -15,6 +15,7 @@ export function Dialogs() {
       <TransferDialog open={dialog === "transfer"} onClose={close} />
       <MineDialog open={dialog === "mine"} onClose={close} />
       <WalletDialog open={dialog === "wallet"} onClose={close} />
+      <AdminDialog open={dialog === "admin"} onClose={close} />
     </>
   );
 }
@@ -156,6 +157,55 @@ function WalletDialog({ open, onClose }: { open: boolean; onClose: () => void })
         </select>
       </Field>
       <p className="xs muted">Empieza con saldo 0. Mina un bloque para cobrar la recompensa.</p>
+    </Modal>
+  );
+}
+
+function AdminDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { isAdmin, login, logout } = useStore();
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) setToken("");
+  }, [open]);
+
+  if (isAdmin) {
+    return (
+      <Modal open={open} onClose={onClose} kicker="Sesión activa en este navegador" title="Administrador"
+        footer={<>
+          <Button onClick={onClose}>Cerrar</Button>
+          <Button variant="danger" onClick={logout}>Cerrar sesión</Button>
+        </>}>
+        <p className="small">
+          Puedes regenerar la red, firmar con las billeteras de la simulación (Alice, Bob, Carol…), minar,
+          manipular copias de la cadena y ejecutar la explotación.
+        </p>
+        <p className="xs muted">El token queda guardado en este navegador hasta que cierres la sesión.</p>
+      </Modal>
+    );
+  }
+
+  const submit = async () => {
+    setBusy(true);
+    const ok = await login(token.trim());
+    setBusy(false);
+    if (ok) onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} kicker="Control de la simulación" title="Ingresar como administrador"
+      footer={<>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="primary" loading={busy} disabled={!token.trim()} onClick={submit}>Ingresar</Button>
+      </>}>
+      <Field label="Token de administrador" help="Es el valor de MINICHAIN_ADMIN_TOKEN configurado en el servidor.">
+        <input className="input mono" type="password" autoComplete="current-password" value={token}
+          onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && token.trim() && submit()} />
+      </Field>
+      <p className="xs muted">
+        Sin token puedes explorar toda la red y usar los laboratorios. Las transacciones propias no necesitan token:
+        la firma de tu billetera es la autorización.
+      </p>
     </Modal>
   );
 }

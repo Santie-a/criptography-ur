@@ -43,11 +43,12 @@ Siempre visible, en todas las páginas. De izquierda a derecha:
 | **minichain explorer** | Vuelve al Resumen. |
 | **simnet · semilla 2026** | Indica que es una red simulada y con qué semilla se generó. |
 | **Buscar** (`Ctrl K` o `/`) | Búsqueda global. Acepta un número de bloque (`3`), el comienzo de un hash o txid (`0003e1`), un nombre (`bob`) o una dirección (`mc3212`). Con las flechas y Enter se va directo al detalle. |
-| **Transferir** | Abre el diálogo para enviar dinero desde tu billetera. |
-| **Minar** | Abre el diálogo para minar un bloque con las transacciones pendientes. |
-| **AL ▾** (identidad) | Con qué billetera firma **este navegador**. Cada persona conectada puede elegir una distinta. |
+| **Transferir** *(administrador)* | Abre el diálogo para enviar dinero desde una billetera de la simulación. |
+| **Minar** *(administrador)* | Abre el diálogo para minar un bloque con las transacciones pendientes. |
+| **AL ▾** (identidad) *(administrador)* | Con qué billetera de la simulación firma el administrador. |
+| **Administrar / Administrador** | Ingresar el token de administrador, o ver la sesión activa y cerrarla. Si el servidor no tiene token configurado, en su lugar aparece **modo abierto**. |
 | **☾ / ☀** | Tema oscuro o claro. |
-| **⚙** | Configuración del escenario. |
+| **⚙** *(administrador)* | Configuración del escenario. |
 
 ### La navegación lateral (izquierda)
 
@@ -88,12 +89,31 @@ actual. Se cierran con **Esc** o con **Cancelar**.
 | **Minar bloque** | La dificultad del bloque (el mínimo de la red o más). Muestra el objetivo y los intentos esperados. | Mina un bloque con todo lo pendiente; la recompensa de 50 va a tu billetera. Al terminar muestra los intentos que tomó y un botón para ver el bloque. |
 | **Nueva billetera** | Nombre y estrategia de nonce. | Crea un par de claves y te cambia a esa billetera. Empieza en 0: mina un bloque para tener fondos. |
 
+### Quién puede hacer qué
+
+La aplicación tiene dos roles (detalle técnico en [Roles](CONECTAR_UI.md#roles)):
+
+| | Visitante (sin token) | Administrador |
+|---|---|---|
+| Explorar bloques, transacciones y billeteras | Sí | Sí |
+| Ver la integridad de la cadena y el análisis de firmas, incluida la clave recuperada | Sí | Sí |
+| Usar los laboratorios | Sí (con límite de uso) | Sí |
+| Transferir, minar, crear billeteras de la simulación y cambiar su nonce | No | Sí |
+| Simular manipulaciones, validar archivos y comparar estrategias | No | Sí |
+| Explotar una clave expuesta y regenerar la red | No | Sí |
+
+Al visitante no se le muestran los botones que no puede usar. Donde una página
+tiene una función de administrador, aparece en su lugar un aviso **Requiere
+administrador** con un botón para ingresar. La barra de estado indica el rol:
+"Solo lectura", "Administrador" o "Modo abierto".
+
+El administrador ingresa con **Administrar** en el encabezado. El token queda
+guardado en ese navegador hasta que cierre la sesión.
+
 ### Varias personas a la vez
 
-Todos los navegadores conectados comparten **la misma red**. Si alguien transfiere
-o mina, los demás lo ven al instante (la página se actualiza sola). Cada persona
-elige su identidad en el encabezado, así que en clase cada estudiante puede tener
-su billetera y enviarle dinero a otro.
+Todos los navegadores conectados comparten **la misma red**. Si el administrador
+transfiere o mina, los demás lo ven al instante (la página se actualiza sola).
 
 ---
 

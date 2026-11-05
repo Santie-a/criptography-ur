@@ -10,7 +10,8 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    MINICHAIN_HOST=0.0.0.0 MINICHAIN_FRONTEND_DIST=/app/frontend/dist
+    MINICHAIN_HOST=0.0.0.0 MINICHAIN_FRONTEND_DIST=/app/frontend/dist \
+    FORWARDED_ALLOW_IPS=*
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY minichain/ minichain/

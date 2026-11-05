@@ -5,11 +5,12 @@ Documentación interactiva generada automáticamente en /api/docs.
 
 from __future__ import annotations
 
+import logging
 import threading
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,7 +21,10 @@ from . import labs
 from .config import Settings, settings as default_settings
 from .events import EventBus
 from .network import BadRequest, Network, NotFound, ScenarioParams, TAMPER_ACTIONS
+from .security import AdminAuth, RateLimiter
 from .storage import storage_from_env
+
+log = logging.getLogger("minichain.app")
 
 NonceKind = Literal["rfc6979", "random", "weak", "constant"]
 
@@ -55,12 +59,12 @@ class TransferRequest(BaseModel):
 
 
 class RawTransaction(BaseModel):
-    sender: str = Field(..., description="clave pública comprimida (hex, 33 bytes)")
-    recipient: str
-    amount: int
-    seq: int
-    memo: str = ""
-    signature: str = Field(..., description="r || s en hex (64 bytes)")
+    sender: str = Field(..., max_length=66, description="clave pública comprimida (hex, 33 bytes)")
+    recipient: str = Field(..., max_length=42)
+    amount: int = Field(..., gt=0, le=10**12)
+    seq: int = Field(..., ge=0)
+    memo: str = Field("", max_length=80)
+    signature: str = Field(..., max_length=128, description="r || s en hex (64 bytes)")
 
 
 class MineRequest(BaseModel):
@@ -142,6 +146,14 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                            allow_methods=["*"], allow_headers=["*"])
 
+    auth = AdminAuth(settings.admin_token)
+    limited = RateLimiter(settings.rate_limit, auth)
+    admin = [Depends(auth)]
+    public_write = [Depends(limited)]
+    if not auth.required:
+        log.warning("MINICHAIN_ADMIN_TOKEN no está definido: modo abierto, cualquiera es "
+                    "administrador. No lo uses así en una URL pública.")
+
     net = network or Network(ScenarioParams(seed=settings.seed, difficulty=settings.difficulty),
                              storage_from_env(settings.database_url, settings.state_file))
     bus = EventBus()
@@ -161,15 +173,26 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
 
     # ---------------------------------------------------------- red
 
+    def auth_info(request: Request) -> dict:
+        return {"required": auth.required, "admin": auth.is_admin(request)}
+
     @app.get("/api/health", tags=["red"])
-    async def health():
-        return {"ok": True, "version": net.version, "clients": bus.clients, "storage": net.storage_info()}
+    async def health(request: Request):
+        return {"ok": True, "version": net.version, "clients": bus.clients,
+                "storage": net.storage_info(), "auth": auth_info(request)}
 
     @app.get("/api/state", tags=["red"], summary="Billeteras, mempool y resumen de bloques")
-    async def state():
-        return await run_in_threadpool(net.state, bus.clients)
+    async def state(request: Request):
+        data = await run_in_threadpool(net.state, bus.clients)
+        data["auth"] = auth_info(request)
+        return data
 
-    @app.post("/api/reset", tags=["red"], summary="Regenerar el escenario simulado")
+    @app.get("/api/admin/check", tags=["administración"], dependencies=admin,
+             summary="Comprobar el token de administrador")
+    async def admin_check():
+        return {"ok": True}
+
+    @app.post("/api/reset", tags=["red"], summary="Regenerar el escenario simulado", dependencies=admin)
     async def reset(req: ResetRequest):
         await run_in_threadpool(net.reset, ScenarioParams(**req.model_dump()))
         await changed("reset")
@@ -203,33 +226,34 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def export_chain():
         return await run_in_threadpool(net.export_chain)
 
-    @app.post("/api/wallets", tags=["billeteras"], summary="Crear una billetera (cada cliente puede tener la suya)")
+    @app.post("/api/wallets", tags=["billeteras"], dependencies=admin,
+              summary="Crear una billetera custodiada por el servidor")
     async def create_wallet(req: WalletRequest):
         w = await run_in_threadpool(net.create_wallet, req.name, req.nonce, req.entropy_bits)
         await changed("wallet", name=w["name"])
         return w
 
-    @app.put("/api/wallets/{name}/nonce", tags=["billeteras"], summary="Cambiar la estrategia de nonce")
+    @app.put("/api/wallets/{name}/nonce", tags=["billeteras"], summary="Cambiar la estrategia de nonce", dependencies=admin)
     async def set_nonce(name: str, req: NonceRequest):
         w = await run_in_threadpool(net.set_nonce, name, req.nonce, req.entropy_bits)
         await changed("wallet", name=name)
         return w
 
-    @app.post("/api/transactions/transfer", tags=["transacciones"],
-              summary="El servidor firma con la billetera indicada y encola la tx")
+    @app.post("/api/transactions/transfer", tags=["transacciones"], dependencies=admin,
+              summary="El servidor firma con una billetera custodiada y encola la tx")
     async def transfer(req: TransferRequest):
         tx = await run_in_threadpool(net.transfer, req.sender, req.recipient, req.amount, req.memo)
         await changed("mempool", txid=tx["txid"])
         return tx
 
-    @app.post("/api/transactions", tags=["transacciones"],
-              summary="Encolar una tx ya firmada por el cliente (clave propia)")
+    @app.post("/api/transactions", tags=["transacciones"], dependencies=public_write,
+              summary="Encolar una tx ya firmada por el cliente (la firma es la autorización)")
     async def submit(req: RawTransaction):
         tx = await run_in_threadpool(net.submit_raw, req.model_dump())
         await changed("mempool", txid=tx["txid"])
         return tx
 
-    @app.post("/api/mine", tags=["cadena"], summary="Minar un bloque con la mempool")
+    @app.post("/api/mine", tags=["cadena"], summary="Minar un bloque con la mempool", dependencies=admin)
     async def mine_block(req: MineRequest):
         result = await run_in_threadpool(net.mine, req.miner, req.difficulty, settings.max_difficulty)
         await changed("block", index=result["block"]["index"])
@@ -245,12 +269,12 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def tamper_actions():
         return TAMPER_ACTIONS
 
-    @app.post("/api/tamper", tags=["validador"],
+    @app.post("/api/tamper", tags=["validador"], dependencies=admin,
               summary="Manipular una copia de la cadena y validarla (no altera la red)")
     async def tamper(req: TamperRequest):
         return await run_in_threadpool(net.tamper, req.block, req.tx, req.action)
 
-    @app.post("/api/validate/external", tags=["validador"], summary="Validar una cadena en JSON")
+    @app.post("/api/validate/external", tags=["validador"], summary="Validar una cadena en JSON", dependencies=admin)
     async def validate_external(data: dict):
         return await run_in_threadpool(net.validate_external, data)
 
@@ -260,29 +284,29 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def attack_scan():
         return await run_in_threadpool(net.attack_scan)
 
-    @app.post("/api/attack/steal", tags=["ataque"], summary="Firmar como la víctima y minar")
+    @app.post("/api/attack/steal", tags=["ataque"], summary="Firmar como la víctima y minar", dependencies=admin)
     async def steal(req: StealRequest):
         result = await run_in_threadpool(net.steal, req.victim, req.thief, req.miner,
                                          settings.max_difficulty)
         await changed("block", index=result["mined"]["block"]["index"])
         return result
 
-    @app.post("/api/defense/compare", tags=["defensa"],
+    @app.post("/api/defense/compare", tags=["defensa"], dependencies=admin,
               summary="Misma simulación con RNG defectuoso y con RFC 6979")
     async def defense(req: DefenseRequest):
         return await run_in_threadpool(Network.compare_defense, req.seed, req.entropy_bits)
 
     # ---------------------------------------------------------- laboratorios
 
-    @app.get("/api/lab/curve", tags=["laboratorio"], summary="Puntos de una curva pequeña")
+    @app.get("/api/lab/curve", tags=["laboratorio"], dependencies=public_write, summary="Puntos de una curva pequeña")
     async def lab_curve(p: int = 97, a: int = 2, b: int = 3):
         return await run_in_threadpool(labs.curve_points, p, a, b)
 
-    @app.post("/api/lab/curve/add", tags=["laboratorio"])
+    @app.post("/api/lab/curve/add", tags=["laboratorio"], dependencies=public_write)
     async def lab_add(req: CurveAddRequest):
         return labs.curve_add(req.p, req.a, req.b, req.P, req.Q)
 
-    @app.post("/api/lab/curve/mul", tags=["laboratorio"], summary="k·P con traza de double-and-add")
+    @app.post("/api/lab/curve/mul", tags=["laboratorio"], dependencies=public_write, summary="k·P con traza de double-and-add")
     async def lab_mul(req: CurveMulRequest):
         return await run_in_threadpool(labs.curve_mul, req.p, req.a, req.b, req.P, req.k)
 
@@ -290,15 +314,15 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def lab_secp():
         return labs.secp256k1_info()
 
-    @app.post("/api/lab/ecdsa/sign", tags=["laboratorio"], summary="Firma ECDSA con todos los pasos")
+    @app.post("/api/lab/ecdsa/sign", tags=["laboratorio"], dependencies=public_write, summary="Firma ECDSA con todos los pasos")
     async def lab_sign(req: SignRequest):
         return await run_in_threadpool(labs.ecdsa_sign, req.message, req.private_key, req.nonce, req.k)
 
-    @app.post("/api/lab/ecdsa/verify", tags=["laboratorio"])
+    @app.post("/api/lab/ecdsa/verify", tags=["laboratorio"], dependencies=public_write)
     async def lab_verify(req: VerifyRequest):
         return await run_in_threadpool(labs.ecdsa_verify, req.message, req.pubkey, req.r, req.s)
 
-    @app.post("/api/lab/ecdsa/recover", tags=["laboratorio"],
+    @app.post("/api/lab/ecdsa/recover", tags=["laboratorio"], dependencies=public_write,
               summary="Recuperar k y d de dos firmas con el mismo r")
     async def lab_recover(req: RecoverRequest):
         return await run_in_threadpool(labs.ecdsa_recover, req.r, req.s1, req.z1, req.s2, req.z2, req.pubkey)
