@@ -85,7 +85,7 @@ la misma semilla genera siempre las mismas claves y montos.
 | **Alice** | Usuaria normal | RFC 6979 (determinista, la defensa) | No |
 | **Bob** | **La víctima** | Un generador aleatorio defectuoso con solo 8 valores posibles, como el de Android en 2013 (configurable) | **Sí** |
 | **Carol** | Usuaria normal | Aleatorio del sistema operativo (correcto) | No |
-| **Minera** | Mina los bloques y cobra la recompensa | No firma transacciones | No |
+| **Minera** | Mina los bloques y cobra la recompensa; en el servidor también regala las monedas de bienvenida a cada participante nuevo | RFC 6979 (solo firma esas bienvenidas) | No |
 | **Mallory** | **La atacante** | No tiene fondos ni acceso a nada: solo lee la cadena pública | — |
 
 Alice, Bob y Carol empiezan con 1000 monedas cada uno. Bob envía la mitad de las

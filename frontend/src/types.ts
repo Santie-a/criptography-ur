@@ -19,6 +19,22 @@ export interface Wallet {
 export interface Participant extends Wallet {
   custody: "dispositivo";
   joined: number;
+  /** Ya recibió las monedas de bienvenida en esta cadena (confirmadas o pendientes). */
+  welcomed: boolean;
+}
+
+/** Respuesta del registro: el participante y, si correspondía, su bienvenida. */
+export interface Registration extends Participant {
+  welcome: Tx | null;
+  welcome_error: string | null;
+}
+
+export interface Automine {
+  /** Segundos entre bloques; 0 = apagado. */
+  interval: number;
+  /** Segundos hasta el próximo intento, contados desde que se pidió el estado. */
+  next_in: number | null;
+  miner: string;
 }
 
 export interface Account {
@@ -87,6 +103,13 @@ export interface NetworkState {
   storage: { kind: string; ok: boolean; error: string | null; restored: boolean };
   /** required: el servidor exige token; admin: este navegador lo tiene. */
   auth: { required: boolean; admin: boolean };
+  /** Monedas que regala `wallet` a cada participante nuevo (0 = desactivado). */
+  faucet: { amount: number; wallet: string };
+  automine: Automine;
+  /** URL pública configurada (MINICHAIN_PUBLIC_URL o la de Render). */
+  public_url: string | null;
+  /** URL adivinada en la red local, si el servidor escucha en 0.0.0.0. */
+  lan_url: string | null;
 }
 
 export interface MerkleProof {

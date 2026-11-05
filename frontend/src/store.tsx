@@ -10,7 +10,7 @@ import { api, ApiError, eventsUrl, getAdminToken, setAdminToken } from "./api";
 import type { AttackScan, NetworkState } from "./types";
 
 type Conn = "connecting" | "online" | "offline";
-export type DialogKind = "transfer" | "mine" | "wallet" | "admin" | null;
+export type DialogKind = "transfer" | "mine" | "wallet" | "admin" | "invite" | null;
 
 interface Toast {
   id: number;

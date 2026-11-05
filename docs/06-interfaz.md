@@ -43,6 +43,7 @@ Siempre visible, en todas las páginas. De izquierda a derecha:
 | **minichain explorer** | Vuelve al Resumen. |
 | **simnet · semilla 2026** | Indica que es una red simulada y con qué semilla se generó. |
 | **Buscar** (`Ctrl K` o `/`) | Búsqueda global. Acepta un número de bloque (`3`), el comienzo de un hash o txid (`0003e1`), un nombre (`bob`) o una dirección (`mc3212`). Con las flechas y Enter se va directo al detalle. |
+| **Invitar** | Muestra un código QR grande con el enlace de la aplicación, para proyectarlo y que el público entre desde el celular. Si la página está abierta en `localhost`, avisa que ese enlace no sirve en otro dispositivo y explica cómo arreglarlo. |
 | **Transferir** *(administrador)* | Abre el diálogo para enviar dinero desde una billetera de la simulación. |
 | **Minar** *(administrador)* | Abre el diálogo para minar un bloque con las transacciones pendientes. |
 | **AL ▾** (identidad) *(administrador)* | Con qué billetera de la simulación firma el administrador. |
@@ -70,8 +71,9 @@ hay claves expuestas.
 
 Muestra en todo momento el estado del sistema: conexión con el servidor, cuántos
 clientes hay conectados, altura de la cadena, dificultad, transacciones
-pendientes, claves expuestas (en rojo, con enlace al análisis) y la hora de la
-última actualización.
+pendientes, el minado automático (si está encendido, "Próximo bloque en 12 s"
+cuando hay algo pendiente), claves expuestas (en rojo, con enlace al análisis) y la
+hora de la última actualización.
 
 ### El inspector (derecha)
 
@@ -81,13 +83,14 @@ ejemplo `#/bloques?b=3`): se puede copiar el enlace, recargar o usar "atrás".
 
 ### Los diálogos
 
-Transferir, minar y crear billetera se abren en una ventana encima de la página
+Invitar, transferir, minar y crear billetera se abren en una ventana encima de la página
 actual. Se cierran con **Esc** o con **Cancelar**.
 
 | Diálogo | Qué pide | Qué hace |
 |---|---|---|
 | **Nueva transacción** | Destinatario, monto y memo. Muestra tu saldo disponible. | Firma con tu billetera (y con la estrategia de nonce de tu billetera) y la deja en la mempool. |
 | **Minar bloque** | La dificultad del bloque (el mínimo de la red o más). Muestra el objetivo y los intentos esperados. | Mina un bloque con todo lo pendiente; la recompensa de 50 va a tu billetera. Al terminar muestra los intentos que tomó y un botón para ver el bloque. |
+| **Unirse a la red** (Invitar) | Nada. | Muestra el código QR y el enlace para abrir **Mi billetera** en otro dispositivo, con un botón para copiarlo. |
 | **Nueva billetera** | Nombre y estrategia de nonce. | Crea un par de claves y te cambia a esa billetera. Empieza en 0: mina un bloque para tener fondos. |
 
 ### Quién puede hacer qué
@@ -116,8 +119,10 @@ guardado en ese navegador hasta que cierre la sesión.
 
 Todos los navegadores conectados comparten **la misma red**. Si alguien envía o el
 administrador mina, los demás lo ven al instante (la página se actualiza sola). En
-clase, cada estudiante crea su billetera en el celular, el administrador le envía
-monedas y desde ahí pueden enviarse entre ellos.
+clase, cada estudiante escanea el código de **Invitar**, crea su billetera en el
+celular y recibe sus monedas de bienvenida; desde ahí pueden enviarse entre ellos.
+Con el minado automático encendido, nadie tiene que pulsar **Minar** para que las
+transacciones se confirmen.
 
 ---
 
@@ -131,16 +136,21 @@ dispositivo**. El servidor nunca la recibe.
 
 | Zona | Qué hace |
 |---|---|
-| **Crear tu billetera** | Pide un nombre, genera un par de claves en el navegador y registra el nombre en la red. El registro va **firmado con la nueva clave**, así nadie puede registrar una clave pública ajena con otro nombre. |
+| **Crear tu billetera** | Pide un nombre, genera un par de claves en el navegador y registra el nombre en la red. El registro va **firmado con la nueva clave**, así nadie puede registrar una clave pública ajena con otro nombre. Al registrarse, la billetera recibe las **monedas de bienvenida** (25 por defecto) que le envía Minera. |
 | **Restaurar una billetera** | Para recuperar una billetera exportada antes: se pega la clave privada (64 dígitos hexadecimales) y el nombre. |
+
+Si se llegó escaneando el código **Recibir** de otra persona, arriba aparece "Vas a
+enviarle monedas a …": después de crear la billetera, el formulario de envío ya
+tiene ese destinatario.
 
 ### Con billetera
 
 | Zona | Qué muestra o hace |
 |---|---|
-| **Saldo** | Lo disponible (descontando lo que está pendiente) y lo confirmado. Se actualiza solo cuando alguien te envía o se mina un bloque. |
+| **Saldo** | Lo disponible (descontando lo que está pendiente) y lo confirmado. Se actualiza solo cuando alguien te envía o se mina un bloque. Si hay algo pendiente y el minado automático está encendido, dice en cuántos segundos se confirma. |
+| **Monedas de bienvenida** | Solo si la billetera aún no las recibió en la red actual (por ejemplo, después de que el administrador regeneró la red): un botón **Pedir 25**. Se reciben una sola vez por red. |
 | **Enviar** | Destinatario (otro participante, una billetera de la simulación o una dirección), monto y memo. **Firmar en este dispositivo y enviar** arma la transacción, la firma aquí y la manda a la red. Debajo, "Qué firmó este dispositivo" muestra el mensaje exacto, su hash z y la firma (r, s). |
-| **Recibir** | Tu dirección, con un botón para copiarla. |
+| **Recibir** | Un código QR y tu dirección, con botones para copiarla y, en el celular, compartir el enlace. Quien escanee el código con la cámara abre la aplicación con el envío hacia ti ya preparado. |
 | **Movimientos** | Lo que enviaste y recibiste, incluido lo pendiente. |
 | **Seguridad** | La clave pública, **Exportar clave privada** (para respaldarla) y **Olvidar billetera en este dispositivo**. |
 
@@ -157,7 +167,11 @@ tienes); lleva a esta página.
 - **Si borras los datos del navegador, pierdes la billetera**, igual que si pierdes
   una billetera real. Por eso existe *Exportar clave privada*.
 - Si el administrador regenera la red, tu billetera sigue registrada con su nombre,
-  pero el saldo vuelve a 0 porque la cadena es nueva.
+  pero el saldo vuelve a 0 porque la cadena es nueva. Puedes volver a pedir las
+  monedas de bienvenida.
+- **Las monedas de bienvenida son una transacción normal**, firmada por Minera (la
+  billetera que cobra las recompensas de bloque). Aparecen en Transacciones con el
+  memo "bienvenida" y quedan pendientes hasta el siguiente bloque.
 
 **Qué concepto ilustra:** la diferencia entre clave privada (secreta, en tu
 dispositivo) y clave pública (la conoce todo el mundo), y que en una blockchain la
@@ -352,6 +366,16 @@ vulnerabilidad a pequeña escala.
 ## 6.11 Escenario
 
 **Propósito:** configurar la simulación y volver a generarla.
+
+Arriba, el panel **Red en vivo** tiene ajustes que se aplican al instante, sin
+regenerar nada:
+
+| Opción | Qué controla |
+|---|---|
+| **Minado automático** | Apagado, o cada 10, 20, 30 o 60 segundos. El servidor mina la mempool a ese ritmo, con la recompensa para Minera. Si no hay nada pendiente, no mina (no se llenan bloques vacíos). Al reiniciar el servidor vuelve al valor de `MINICHAIN_AUTOMINE`. |
+| **Monedas de bienvenida** | Solo informativo: cuánto recibe cada billetera de dispositivo nueva. Se configura con `MINICHAIN_FAUCET`. |
+
+Debajo, los parámetros del escenario, que solo se aplican al regenerar:
 
 | Opción | Qué controla |
 |---|---|

@@ -479,3 +479,14 @@ ul.bullet { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
   /* En el celular los controles son más altos: más fáciles de tocar. */
   .wallet-page .btn, .wallet-page .input, .wallet-page .select { height: 44px; font-size: var(--text-base); }
 }
+
+/* Compartir: códigos QR */
+svg.qr { display: block; flex: none; background: #fff; }
+.receive { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.invite { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); padding: var(--s-2) 0; }
+.invite svg.qr { width: min(280px, 70vw); height: auto; }
+.invite-url { word-break: break-all; text-align: center; color: var(--text-muted); }
+@media (max-width: 760px) {
+  .receive { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .receive .stack { width: 100%; }
+}

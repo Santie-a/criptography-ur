@@ -5,8 +5,10 @@ Documentación interactiva generada automáticamente en /api/docs.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
+import time
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -18,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import labs
-from .config import Settings, settings as default_settings
+from .config import Settings, lan_url, settings as default_settings
 from .events import EventBus
 from .network import BadRequest, Network, NotFound, ScenarioParams, TAMPER_ACTIONS
 from .security import AdminAuth, RateLimiter
@@ -72,6 +74,14 @@ class ParticipantRequest(BaseModel):
     pubkey: str = Field(..., min_length=66, max_length=66, description="clave pública comprimida (hex)")
     signature: str = Field(..., min_length=128, max_length=128,
                            description="firma de 'minichain:registro:{name}:{pubkey}' (r || s)")
+
+
+class FaucetRequest(BaseModel):
+    address: str = Field(..., min_length=42, max_length=42)
+
+
+class AutomineRequest(BaseModel):
+    interval: int = Field(..., ge=0, le=3600, description="segundos entre bloques; 0 = apagado")
 
 
 class MineRequest(BaseModel):
@@ -143,7 +153,9 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         # Al arrancar (o despertar en Render) se precalculan validación y
         # análisis en segundo plano, sin bloquear las primeras peticiones.
         threading.Thread(target=app.state.network.warm_up, daemon=True).start()
+        task = asyncio.create_task(automine_loop())
         yield
+        task.cancel()
 
     app = FastAPI(title="minichain API", version="1.0.0",
                   description="Mini-blockchain con ECDSA sobre secp256k1 y el ataque por nonce repetido.",
@@ -162,7 +174,9 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
                     "administrador. No lo uses así en una URL pública.")
 
     net = network or Network(ScenarioParams(seed=settings.seed, difficulty=settings.difficulty),
-                             storage_from_env(settings.database_url, settings.state_file))
+                             storage_from_env(settings.database_url, settings.state_file),
+                             faucet_amount=settings.faucet_amount, automine_interval=settings.automine)
+    links = {"public_url": settings.public_url, "lan_url": lan_url(settings)}
     bus = EventBus()
     app.state.network = net
     app.state.bus = bus
@@ -178,6 +192,19 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def changed(kind: str, **extra) -> None:
         await bus.publish({"type": kind, "version": net.version, **extra})
 
+    async def automine_loop() -> None:
+        while True:
+            await asyncio.sleep(1)
+            try:
+                result = await run_in_threadpool(net.automine_tick, time.time(), settings.max_difficulty)
+            except Exception:  # noqa: BLE001 - el bucle no debe morir por un bloque fallido
+                log.exception("falló el minado automático")
+                continue
+            if result:
+                log.info("bloque %d minado automáticamente (%d tx)", result["block"]["index"],
+                         result["block"]["tx_count"])
+                await changed("block", index=result["block"]["index"], auto=True)
+
     # ---------------------------------------------------------- red
 
     def auth_info(request: Request) -> dict:
@@ -192,6 +219,7 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     async def state(request: Request):
         data = await run_in_threadpool(net.state, bus.clients)
         data["auth"] = auth_info(request)
+        data.update(links)
         return data
 
     @app.get("/api/admin/check", tags=["administración"], dependencies=admin,
@@ -223,6 +251,13 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         p = await run_in_threadpool(net.register_participant, req.name, req.pubkey, req.signature)
         await changed("participant", name=p["name"])
         return p
+
+    @app.post("/api/faucet", tags=["billeteras"], dependencies=public_write,
+              summary="Pedir las monedas de bienvenida (una vez por participante y cadena)")
+    async def faucet(req: FaucetRequest):
+        tx = await run_in_threadpool(net.faucet, req.address)
+        await changed("mempool", txid=tx["txid"])
+        return tx
 
     @app.get("/api/accounts/{address}", tags=["billeteras"],
              summary="Saldo y siguiente seq de una dirección")
@@ -277,6 +312,13 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         result = await run_in_threadpool(net.mine, req.miner, req.difficulty, settings.max_difficulty)
         await changed("block", index=result["block"]["index"])
         return result
+
+    @app.put("/api/automine", tags=["cadena"], dependencies=admin,
+             summary="Configurar el minado automático (segundos entre bloques, 0 = apagado)")
+    async def automine(req: AutomineRequest):
+        info = await run_in_threadpool(net.set_automine, req.interval)
+        await changed("automine")
+        return info
 
     # ---------------------------------------------------------- validación
 

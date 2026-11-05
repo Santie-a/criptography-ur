@@ -17,9 +17,13 @@ dice **qué abrir**, **qué hacer** y **qué decir**.
       PC desde el que se expone. Sin eso no aparecen Minar, Transferir ni Explotar.
 - [ ] Ir a **Escenario** y comprobar: semilla 2026, dificultad 14, Bob con **RNG
       defectuoso**, entropía 3. Pulsar **Regenerar** para partir de una red limpia.
-- [ ] Si el público se va a conectar desde sus celulares: arrancar con
-      `MINICHAIN_HOST=0.0.0.0 python -m server` y compartir la IP del computador
-      (ver [Despliegue](DESPLIEGUE.md)).
+- [ ] Si el público se va a conectar desde sus celulares: en la versión publicada
+      no hay que hacer nada. En local, arrancar con
+      `MINICHAIN_HOST=0.0.0.0 MINICHAIN_AUTOMINE=20 python -m server` (ver
+      [Despliegue](DESPLIEGUE.md)).
+- [ ] En **Escenario → Red en vivo**, decidir el minado automático: encendido
+      para la parte con el público; **Apagado** para el paso 2, si se quiere minar
+      a mano con transacciones pendientes.
 - [ ] Plan B si algo falla: `python -m minichain --pausa` en una terminal cuenta la
       misma historia paso a paso.
 
@@ -27,13 +31,18 @@ dice **qué abrir**, **qué hacer** y **qué decir**.
 
 ## 0. Opcional: que el público se una (3 min) · Tú → Mi billetera
 
-**Hacer:** compartir la URL. Cada persona abre **Mi billetera** en su celular,
-escribe su nombre y pulsa **Crear billetera**. Desde el PC (administrador), enviarle
-monedas a algunos con **Transferir** y **Minar**. Pedirles que se envíen entre ellos.
+**Hacer:** pulsar **Invitar** en el encabezado y proyectar el código QR. Cada
+persona lo escanea con la cámara, escribe su nombre y pulsa **Crear billetera**:
+recibe 25 monedas de bienvenida, que se confirman con el siguiente bloque
+automático. Pedirles que se envíen entre ellos: en **Mi billetera → Recibir** cada
+uno tiene su propio código, y quien lo escanea abre el envío ya dirigido a esa
+persona.
 
 **Decir:** "La clave privada de cada uno se acaba de generar en su celular y no salió
 de ahí. Para enviar no necesitan contraseña: la firma es la prueba de que son
-ustedes. Ni yo, que administro el servidor, puedo gastar su dinero."
+ustedes. Ni yo, que administro el servidor, puedo gastar su dinero. Las monedas de
+bienvenida son una transacción firmada por la minera, que cobra 50 por cada bloque:
+la barra de abajo dice cuántos segundos faltan para el próximo."
 
 ---
 

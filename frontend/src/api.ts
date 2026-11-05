@@ -4,7 +4,7 @@ import type {
   AttackScan, BlockDetail, CurveAdd, CurveMul, CurvePoints, DefenseStats, MerkleProof,
   MineResult, NetworkState, NonceKind, Pt, RecoverResult, ScenarioParams, SearchResult, Secp256k1Info,
   SignResult, StealResult, TamperResult, Tx, TxDetail, TxRow, ValidationResult, VerifySteps, Wallet,
-  WalletDetail, Account, Participant,
+  WalletDetail, Account, Automine, Registration,
 } from "./types";
 
 const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
@@ -85,7 +85,8 @@ export const api = {
   // billetera del dispositivo (la firma se hace en el navegador)
   account: (address: string) => get<Account>(`/api/accounts/${address}`),
   registerParticipant: (name: string, pubkey: string, signature: string) =>
-    post<Participant>("/api/participants", { name, pubkey, signature }),
+    post<Registration>("/api/participants", { name, pubkey, signature }),
+  faucet: (address: string) => post<Tx>("/api/faucet", { address }),
   submitTransaction: (tx: { sender: string; recipient: string; amount: number; seq: number; memo: string; signature: string }) =>
     post<Tx>("/api/transactions", tx),
   // billeteras y transacciones
@@ -95,6 +96,7 @@ export const api = {
   transfer: (sender: string, recipient: string, amount: number, memo: string) =>
     post<Tx>("/api/transactions/transfer", { sender, recipient, amount, memo }),
   mine: (miner: string, difficulty?: number) => post<MineResult>("/api/mine", { miner, difficulty }),
+  setAutomine: (interval: number) => put<Automine>("/api/automine", { interval }),
   // validador
   validate: () => get<ValidationResult>("/api/validate"),
   tamper: (block: number, tx: number, action: string) =>

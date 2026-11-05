@@ -4,13 +4,14 @@
 //   barra de estado: visibilidad del estado del sistema (heurística 1 de Nielsen)
 import {
   Blocks, Boxes, Coins, FileSignature, Hammer, LayoutDashboard, Menu, Moon, ScanSearch, Search,
-  Lock, Send, Settings2, ShieldCheck, Smartphone, Spline, Sun, Wallet,
+  Lock, QrCode, Send, Settings2, ShieldCheck, Smartphone, Spline, Sun, Timer, Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { api } from "../api";
 import { go, href } from "../router";
 import { useStore } from "../store";
 import type { SearchResult } from "../types";
+import { useAutomineCountdown } from "./share";
 import { initials } from "./ui";
 import { useDeviceWallet } from "../wallet/device";
 
@@ -89,6 +90,10 @@ export function Header({ onToggleNav }: { onToggleNav: () => void }) {
       )}
       <GlobalSearch />
       <div className="header-right">
+        <button className="header-btn" onClick={() => openDialog("invite")} title="Código QR para unirse desde otro dispositivo">
+          <QrCode size={16} /><span className="label-text">Invitar</span>
+        </button>
+        <span className="header-sep hide-sm" />
         {isAdmin && (
           <>
             <button className="header-btn hide-sm" onClick={() => openDialog("transfer")} title="Nueva transacción">
@@ -282,6 +287,7 @@ export function StatusBar() {
           <span className="num">Altura {state.height}</span>
           <span className="num hide-sm">Dificultad {state.difficulty} bits</span>
           <span className="num">Pendientes {state.mempool.length}</span>
+          <AutomineStatus pending={state.mempool.length} />
           {state.storage && (
             <span className="hide-sm" title={state.storage.error ?? `La red se guarda en ${state.storage.kind}`}
               style={state.storage.ok ? undefined : { color: "var(--bad-text)" }}>
@@ -303,5 +309,16 @@ export function StatusBar() {
         {updatedAt ? `Actualizado ${updatedAt.toLocaleTimeString("es-CO")}` : "—"} · secp256k1
       </span>
     </footer>
+  );
+}
+
+function AutomineStatus({ pending }: { pending: number }) {
+  const { interval, remaining } = useAutomineCountdown();
+  if (!interval) return null;
+  return (
+    <span className="num" title={`El servidor mina la mempool cada ${interval} s`}>
+      <Timer size={12} style={{ verticalAlign: "-2px", marginRight: 4 }} />
+      {pending > 0 && remaining !== null ? `Próximo bloque en ${remaining} s` : "Minado automático"}
+    </span>
   );
 }

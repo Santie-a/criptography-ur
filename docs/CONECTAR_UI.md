@@ -75,7 +75,7 @@ público con límite de peticiones por IP.
 | Método | Ruta | Rol | Para qué |
 |---|---|---|---|
 | GET | `/api/health` | público | Estado del servidor, del almacenamiento y del rol de quien pregunta |
-| GET | `/api/state` | público | Billeteras, mempool, resumen de bloques, parámetros, rol |
+| GET | `/api/state` | público | Billeteras, mempool, resumen de bloques, parámetros, rol, minado automático (`automine`), monedas de bienvenida (`faucet`) y enlaces para invitar (`public_url`, `lan_url`) |
 | GET | `/api/admin/check` | admin | Comprobar un token |
 | POST | `/api/reset` | admin | Regenerar el escenario (semilla, dificultad, nonce de Bob…) |
 | GET | `/api/search?q=` | público | Búsqueda global: bloque, txid, billetera o dirección |
@@ -85,13 +85,15 @@ público con límite de peticiones por IP.
 | GET | `/api/transactions` | público | Transacciones confirmadas (filtro opcional `?address=`) |
 | GET | `/api/transactions/{txid}` | público | Una transacción con su bloque y prueba Merkle |
 | GET | `/api/wallets/{nombre}` | público | Billetera con su historial |
-| POST | `/api/participants` | límite | Registrar el nombre de una billetera de dispositivo. Va firmado: `minichain:registro:{nombre}:{clave pública}` |
+| POST | `/api/participants` | límite | Registrar el nombre de una billetera de dispositivo. Va firmado: `minichain:registro:{nombre}:{clave pública}`. La respuesta incluye `welcome` (la transacción de bienvenida, si se envió) o `welcome_error` |
+| POST | `/api/faucet` | límite | Pedir las monedas de bienvenida para un participante registrado. Una vez por dirección y por red |
 | GET | `/api/accounts/{dirección}` | público | Saldo, disponible y siguiente `seq` de cualquier dirección (lo que necesita un dispositivo para firmar) |
 | POST | `/api/wallets` | admin | Crear una billetera custodiada por el servidor |
 | PUT | `/api/wallets/{nombre}/nonce` | admin | Cambiar su estrategia de nonce |
 | POST | `/api/transactions/transfer` | admin | El servidor firma con una billetera custodiada |
 | POST | `/api/transactions` | **límite** | Enviar una transacción firmada por el cliente: la firma es la autorización |
 | POST | `/api/mine` | admin | Minar un bloque con la mempool |
+| PUT | `/api/automine` | admin | Minado automático: `{"interval": 20}` (segundos; 0 = apagado) |
 | GET | `/api/validate` | público | Validar la cadena real (en caché) |
 | POST | `/api/tamper` | admin | Manipular una copia y validarla |
 | POST | `/api/validate/external` | admin | Validar una cadena en JSON |
@@ -99,7 +101,7 @@ público con límite de peticiones por IP.
 | POST | `/api/attack/steal` | admin | Firmar como la víctima y minar |
 | POST | `/api/defense/compare` | admin | Comparar RNG defectuoso contra RFC 6979 |
 | GET/POST | `/api/lab/...` | límite | Curva de juguete, double-and-add, firma y verificación paso a paso |
-| WS | `/api/events` | público | Eventos `{type, version}`: `reset`, `wallet`, `mempool`, `block`, `presence` |
+| WS | `/api/events` | público | Eventos `{type, version}`: `reset`, `wallet`, `participant`, `mempool`, `block` (con `auto: true` si lo minó el servidor), `automine`, `presence` |
 
 ### Roles
 
@@ -119,6 +121,11 @@ público con límite de peticiones por IP.
   API no protegería nada.
 - Las escrituras públicas tienen un límite por IP (`MINICHAIN_RATE_LIMIT`, 60 por
   minuto por defecto). El administrador no tiene límite.
+- Las monedas de bienvenida salen del saldo de Minera y solo se entregan a
+  participantes registrados (con registro firmado), una vez por red. Alguien podría
+  crear muchas claves para pedir más; lo frenan el límite por IP, el máximo de 500
+  participantes y el saldo de Minera. Para una demostración basta; en una red real
+  un faucet necesita algo más (captcha, cuentas verificadas).
 
 ## Usar la simulación sin la UI
 
@@ -184,6 +191,9 @@ Ejemplo: mostrar cuántos bits en cero tiene cada hash de bloque.
 | `MINICHAIN_STATE_FILE` | vacío | Alternativa local: guardar la red en un archivo JSON |
 | `MINICHAIN_ADMIN_TOKEN` | vacío | Token del administrador. Vacío = modo abierto (solo desarrollo) |
 | `MINICHAIN_RATE_LIMIT` | `60` | Escrituras públicas por minuto y por IP (0 = sin límite) |
+| `MINICHAIN_AUTOMINE` | `0` | Minar la mempool cada N segundos (0 = solo minado manual). El administrador lo cambia en Escenario hasta el siguiente reinicio |
+| `MINICHAIN_FAUCET` | `25` | Monedas de bienvenida para cada billetera de dispositivo nueva (0 = desactivado) |
+| `MINICHAIN_PUBLIC_URL` | vacío | URL con la que otros dispositivos abren la aplicación, para el QR de **Invitar**. En Render no hace falta: se usa `RENDER_EXTERNAL_URL` |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxies de los que se acepta `X-Forwarded-For` (en el Dockerfile: `*`, para Render) |
 | `MINICHAIN_SEED` | `2026` | Semilla del escenario inicial |
 | `MINICHAIN_DIFFICULTY` | `14` | Dificultad inicial (bits) |

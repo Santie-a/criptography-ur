@@ -5,7 +5,8 @@ Personajes:
   Bob      la víctima: su billetera usa la estrategia de nonce configurable
            (por defecto un RNG con poca entropía, como Android en 2013)
   Carol    firma con nonces aleatorios del sistema operativo (correcto)
-  Minera   recibe la recompensa de cada bloque; nunca firma
+  Minera   recibe la recompensa de cada bloque; en el escenario inicial no
+           firma, pero en el servidor regala las monedas de bienvenida
   Mallory  la atacante: no tiene fondos y solo lee la cadena pública
 """
 

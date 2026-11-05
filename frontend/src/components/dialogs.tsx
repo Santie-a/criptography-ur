@@ -1,10 +1,12 @@
 // Acciones globales en diálogos modales, abiertas desde el encabezado:
 // funcionan desde cualquier pantalla sin perder el contexto.
+import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { go } from "../router";
 import { useStore } from "../store";
 import type { MineResult, NonceKind } from "../types";
+import { QrCode, appLink, joinUrl } from "./share";
 import { Button, Field, Modal, Notice } from "./ui";
 
 export function Dialogs() {
@@ -16,6 +18,7 @@ export function Dialogs() {
       <MineDialog open={dialog === "mine"} onClose={close} />
       <WalletDialog open={dialog === "wallet"} onClose={close} />
       <AdminDialog open={dialog === "admin"} onClose={close} />
+      <InviteDialog open={dialog === "invite"} onClose={close} />
     </>
   );
 }
@@ -113,6 +116,12 @@ function MineDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
         <dt>Intentos esperados</dt><dd className="num">2<sup>{difficulty}</sup> ≈ {(2 ** difficulty).toLocaleString("es")}</dd>
         <dt>Transacciones</dt><dd className="num">{state.mempool.length} pendientes + recompensa</dd>
       </dl>
+      {state.automine.interval > 0 && !last && (
+        <p className="xs muted">
+          El minado automático también mina la mempool cada {state.automine.interval} s, con la recompensa
+          para {state.automine.miner}.
+        </p>
+      )}
       {last && (
         <Notice tone="ok" title={`Bloque ${last.r.block.index} agregado a la cadena`}>
           {last.r.attempts.toLocaleString("es")} intentos en {(last.ms / 1000).toFixed(2)} s · hash <code>{last.r.block.hash.slice(0, 16)}…</code>
@@ -205,6 +214,41 @@ function AdminDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
       <p className="xs muted">
         Sin token puedes explorar toda la red y usar los laboratorios. Las transacciones propias no necesitan token:
         la firma de tu billetera es la autorización.
+      </p>
+    </Modal>
+  );
+}
+
+/** Código QR para que otros abran la aplicación en su celular. Pensado para proyectarlo. */
+function InviteDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { state, notify } = useStore();
+  const link = appLink(state);
+  const url = joinUrl(link);
+  const welcome = state?.faucet.amount ?? 0;
+  return (
+    <Modal open={open} onClose={onClose} kicker="Apunta la cámara del celular al código" title="Unirse a la red"
+      footer={<>
+        <Button onClick={onClose}>Cerrar</Button>
+        <Button icon={<Copy size={14} />} onClick={() => {
+          navigator.clipboard?.writeText(url).then(() => notify("Enlace copiado"));
+        }}>Copiar enlace</Button>
+      </>}>
+      <div className="invite">
+        {open && <QrCode value={url} size={280} label={`Código QR de ${url}`} />}
+        <code className="mono small invite-url">{url}</code>
+      </div>
+      {link.source === "local" ? (
+        <Notice tone="warn" title="Este enlace solo funciona en este computador">
+          La página está abierta en <code>localhost</code>. Para que entren otros dispositivos, arranca el servidor con{" "}
+          <code>MINICHAIN_HOST=0.0.0.0</code> y abre la página con la IP del computador, o define{" "}
+          <code>MINICHAIN_PUBLIC_URL</code>.
+        </Notice>
+      ) : link.source === "lan" ? (
+        <p className="xs muted">Dirección de la red local detectada por el servidor: los celulares deben estar en la misma Wi-Fi.</p>
+      ) : null}
+      <p className="xs muted">
+        Cada persona crea su billetera en su propio dispositivo
+        {welcome > 0 ? ` y recibe ${welcome} monedas de bienvenida de ${state?.faucet.wallet}` : ""}.
       </p>
     </Modal>
   );

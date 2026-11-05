@@ -66,9 +66,22 @@ TAMPER_ACTIONS = {
 }
 
 
+# La billetera que cobra las recompensas de bloque también regala las monedas
+# de bienvenida a cada participante nuevo (un "faucet").
+FAUCET_WALLET = "Minera"
+FAUCET_MEMO = "bienvenida"
+
+
 class Network:
-    def __init__(self, params: ScenarioParams | None = None, storage: Storage | None = None):
+    def __init__(self, params: ScenarioParams | None = None, storage: Storage | None = None,
+                 faucet_amount: int = 0, automine_interval: int = 0):
         self.lock = threading.RLock()
+        # Monedas de bienvenida por participante (0 = desactivado).
+        self.faucet_amount = max(0, faucet_amount)
+        # Minado automático: cada cuántos segundos se mina la mempool (0 = apagado).
+        # No se guarda: al reiniciar vuelve al valor de MINICHAIN_AUTOMINE.
+        self.automine_interval = max(0, automine_interval)
+        self.next_automine_at: float | None = None
         self.version = 0
         self.storage: Storage = storage or MemoryStorage()
         self.storage_error: str | None = None
@@ -270,10 +283,58 @@ class Network:
                 self.participants[address] = {"name": name, "pubkey": pubkey_hex,
                                               "joined": (known or {}).get("joined", int(time.time()))}
                 self._changed()
-            return self.participant_json(address)
+            result = self.participant_json(address)
+            result["welcome"], result["welcome_error"] = None, None
+            if self.faucet_amount and not result["welcomed"]:
+                try:
+                    result["welcome"] = self._faucet(address)
+                    result["welcomed"] = True
+                    result["available"] = self.node.available_balance(address)
+                except BadRequest as exc:
+                    result["welcome_error"] = str(exc)
+            return result
 
-    def participant_json(self, address: str) -> dict:
+    # ------------------------------------------------------------ monedas de bienvenida
+
+    def _welcomed(self) -> set[str]:
+        """Direcciones que ya recibieron la bienvenida en esta cadena (confirmada o pendiente).
+
+        Se deduce de la propia cadena, así que sobrevive a reinicios y se
+        reinicia sola al regenerar la red.
+        """
+        faucet = self.wallets.get(FAUCET_WALLET)
+        if faucet is None:
+            return set()
+        txs = [tx for b in self.chain.blocks for tx in b.transactions] + list(self.node.mempool)
+        return {tx.recipient for tx in txs
+                if not tx.is_coinbase and tx.sender == faucet.pubkey_hex and tx.memo == FAUCET_MEMO}
+
+    def _faucet(self, address: str) -> dict:
+        if not self.faucet_amount:
+            raise BadRequest("las monedas de bienvenida están desactivadas en este servidor")
+        if address not in self.participants:
+            raise BadRequest("primero registra la billetera")
+        if address in self._welcomed():
+            raise BadRequest("esta billetera ya recibió sus monedas de bienvenida")
+        faucet = self.wallets.get(FAUCET_WALLET)
+        if faucet is None:
+            raise BadRequest(f"no existe la billetera {FAUCET_WALLET!r}")
+        if self.node.available_balance(faucet.address) < self.faucet_amount:
+            raise BadRequest(f"{FAUCET_WALLET} no tiene fondos suficientes; vuelve a pedir "
+                             "después del próximo bloque")
+        tx = Transaction.create(faucet, address, self.faucet_amount,
+                                self.node.next_seq(faucet.address), FAUCET_MEMO)
+        return self._submit(tx)
+
+    def faucet(self, address: str) -> dict:
+        """Envía las monedas de bienvenida a un participante (una vez por cadena)."""
+        with self.lock:
+            return self._faucet(address.strip())
+
+    def participant_json(self, address: str, welcomed: set[str] | None = None) -> dict:
         p = self.participants[address]
+        if welcomed is None:
+            welcomed = self._welcomed()
         return {
             "name": p["name"],
             "address": address,
@@ -285,6 +346,7 @@ class Network:
             "nonce_label": "RFC 6979, en el dispositivo",
             "custody": "dispositivo",
             "joined": p["joined"],
+            "welcomed": address in welcomed,
         }
 
     def account(self, address: str) -> dict:
@@ -376,6 +438,46 @@ class Network:
             self._changed()
             return {"block": self.block_summary(block), "attempts": attempts,
                     "expected_attempts": 2 ** block.difficulty}
+
+    # ------------------------------------------------------------ minado automático
+
+    MAX_AUTOMINE_INTERVAL = 3600
+
+    def set_automine(self, interval: int) -> dict:
+        if not 0 <= interval <= self.MAX_AUTOMINE_INTERVAL:
+            raise BadRequest(f"el intervalo debe estar entre 0 y {self.MAX_AUTOMINE_INTERVAL} segundos")
+        with self.lock:
+            self.automine_interval = interval
+            self.next_automine_at = time.time() + interval if interval else None
+            self._changed()
+            return self.automine_info()
+
+    def automine_info(self, now: float | None = None) -> dict:
+        now = time.time() if now is None else now
+        next_in = None
+        if self.automine_interval and self.next_automine_at is not None:
+            next_in = round(max(0.0, self.next_automine_at - now), 1)
+        return {"interval": self.automine_interval, "next_in": next_in, "miner": FAUCET_WALLET}
+
+    def automine_tick(self, now: float, max_difficulty: int) -> dict | None:
+        """Lo llama el servidor cada segundo. Mina si se cumplió el intervalo y hay pendientes.
+
+        El ritmo es fijo (cada `interval` segundos) para que la cuenta regresiva
+        de la interfaz sea predecible; si la mempool está vacía, no se mina.
+        """
+        with self.lock:
+            if not self.automine_interval:
+                self.next_automine_at = None
+                return None
+            if self.next_automine_at is None:
+                self.next_automine_at = now + self.automine_interval
+                return None
+            if now < self.next_automine_at:
+                return None
+            self.next_automine_at = now + self.automine_interval
+            if not self.node.mempool or FAUCET_WALLET not in self.wallets:
+                return None
+            return self.mine(FAUCET_WALLET, None, max_difficulty)
 
     # ------------------------------------------------------------ lectura
 
@@ -526,6 +628,7 @@ class Network:
 
     def state(self, clients: int = 0) -> dict:
         with self.lock:
+            welcomed = self._welcomed()
             return {
                 "version": self.version,
                 "params": asdict(self.params),
@@ -533,12 +636,14 @@ class Network:
                 "height": len(self.chain.blocks) - 1,
                 "tip": self.chain.tip.hash(),
                 "wallets": [self.wallet_json(w) for w in self.wallets.values()],
-                "participants": [self.participant_json(a) for a in self.participants],
+                "participants": [self.participant_json(a, welcomed) for a in self.participants],
                 "mempool": [self.tx_json(tx) for tx in self.node.mempool],
                 "blocks": [self.block_summary(b) for b in self.chain.blocks],
                 "nonce_kinds": NONCE_KINDS,
                 "clients": clients,
                 "storage": self.storage_info(),
+                "faucet": {"amount": self.faucet_amount, "wallet": FAUCET_WALLET},
+                "automine": self.automine_info(),
             }
 
     def export_chain(self) -> dict:

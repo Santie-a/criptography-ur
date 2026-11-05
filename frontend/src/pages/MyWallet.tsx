@@ -3,11 +3,12 @@
 // Todo lo que requiere la clave privada (crear la billetera, registrar el
 // nombre y firmar transacciones) ocurre aquí, en el navegador. Al servidor solo
 // le llegan la clave pública, el nombre y las firmas.
-import { ArrowDownLeft, ArrowUpRight, Copy, KeyRound, PenLine, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Copy, Gift, KeyRound, PenLine, Share2, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
+import { QrCode, appLink, payUrl, useAutomineCountdown } from "../components/share";
 import { AsyncButton, Button, Empty, Field, Hex, Notice, PageHeader, Panel, Tag, fmtTime } from "../components/ui";
-import { href, go } from "../router";
+import { href, go, useRoute } from "../router";
 import { useStore } from "../store";
 import type { Tx, TxRow } from "../types";
 import { generatePrivateKey, isValidPrivateKey, registrationMessage, signMessage, signTransaction } from "../wallet/crypto";
@@ -32,25 +33,45 @@ export function MyWallet() {
   );
 }
 
+const isAddress = (a: string) => /^mc[0-9a-f]{40}$/.test(a);
+
+/** Aviso de cuándo se confirma lo pendiente, según el minado automático. */
+function ConfirmHint() {
+  const { interval, remaining } = useAutomineCountdown();
+  if (!interval || remaining === null) return <>Queda pendiente hasta que se mine un bloque.</>;
+  return <>Se confirma con el próximo bloque, en unos {remaining} s.</>;
+}
+
 function Onboarding({ onCreated }: { onCreated: (w: DeviceWallet) => boolean }) {
-  const { run, notify } = useStore();
+  const { state, run, notify } = useStore();
+  const to = useRoute().params.get("to") ?? "";
+  const payee = [...(state?.participants ?? []), ...(state?.wallets ?? [])].find((w) => w.address === to);
   const [name, setName] = useState("");
   const [restoreKey, setRestoreKey] = useState("");
   const [restoreName, setRestoreName] = useState("");
 
   const create = async (nm: string, priv: string) => {
     const w = makeDeviceWallet(nm.trim(), priv);
-    const ok = await run(() => register(w));
-    if (!ok) return;
+    const reg = await run(() => register(w));
+    if (!reg) return;
     if (!onCreated(w)) {
       notify("Este navegador no permite guardar datos (¿modo privado?). La billetera no se pudo guardar.", "bad");
       return;
     }
-    notify(`Billetera de ${w.name} creada en este dispositivo`);
+    notify(reg.welcome
+      ? `Billetera de ${w.name} creada. Recibes ${reg.welcome.amount} monedas de bienvenida.`
+      : `Billetera de ${w.name} creada en este dispositivo`);
   };
 
   return (
     <div className="wallet-grid">
+      {isAddress(to) && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Notice title={`Vas a enviarle monedas a ${payee?.name ?? "una dirección"}`}>
+            Primero crea tu billetera; después el formulario de envío ya tendrá el destinatario.
+          </Notice>
+        </div>
+      )}
       <Panel title={<><Smartphone size={15} /> Crear tu billetera</>}>
         <div className="stack">
           <Field label="Tu nombre en la red" help="Lo verán los demás participantes en lugar de tu dirección.">
@@ -62,6 +83,9 @@ function Onboarding({ onCreated }: { onCreated: (w: DeviceWallet) => boolean }) 
           <ul className="small muted bullet">
             <li>Se genera un par de claves ECDSA (secp256k1) en este navegador.</li>
             <li>El servidor recibe tu nombre y tu clave pública, firmados con tu clave para probar que son tuyos.</li>
+            {(state?.faucet.amount ?? 0) > 0 && (
+              <li>Al crearla recibes {state?.faucet.amount} monedas de bienvenida de {state?.faucet.wallet}.</li>
+            )}
             <li>Si borras los datos del navegador, pierdes la billetera. Puedes exportar la clave para respaldarla.</li>
           </ul>
         </div>
@@ -85,7 +109,7 @@ function Onboarding({ onCreated }: { onCreated: (w: DeviceWallet) => boolean }) 
 }
 
 function WalletView({ wallet, onForget }: { wallet: DeviceWallet; onForget: () => void }) {
-  const { state, notify } = useStore();
+  const { state, notify, run } = useStore();
   const me = state?.participants.find((p) => p.address === wallet.address);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const tried = useRef(false);
@@ -117,27 +141,59 @@ function WalletView({ wallet, onForget }: { wallet: DeviceWallet; onForget: () =
             <div className="small muted">
               disponibles{me && me.balance !== me.available && ` · ${me.balance} confirmados`}
             </div>
+            {me && me.balance !== me.available && <div className="xs muted"><ConfirmHint /></div>}
           </div>
         </Panel>
+        {me && !me.welcomed && (state?.faucet.amount ?? 0) > 0 && (
+          <Notice title="Monedas de bienvenida"
+            actions={<AsyncButton size="sm" icon={<Gift size={14} />} onRun={async () => {
+              const tx = await run(() => api.faucet(wallet.address));
+              if (tx) notify(`${state?.faucet.wallet} te envió ${tx.amount} monedas`);
+            }}>Pedir {state?.faucet.amount}</AsyncButton>}>
+            Esta billetera todavía no recibió sus monedas de bienvenida en la red actual.
+          </Notice>
+        )}
         <SendForm wallet={wallet} available={me?.available ?? 0} />
       </div>
       <div className="stack-lg">
-        <Panel title="Recibir">
-          <div className="stack">
-            <span className="small muted">Comparte tu nombre o esta dirección para que te envíen monedas.</span>
-            <div className="address-box">
-              <code className="mono">{wallet.address}</code>
-              <Button size="sm" icon={<Copy size={12} />} onClick={() => {
-                navigator.clipboard?.writeText(wallet.address).then(() => notify("Dirección copiada"));
-              }}>Copiar</Button>
-            </div>
-            <a className="xs" href={href("billeteras", { w: wallet.name })}>Ver en el explorador</a>
-          </div>
-        </Panel>
+        <Receive wallet={wallet} />
         <History address={wallet.address} />
         <Security wallet={wallet} onForget={onForget} />
       </div>
     </div>
+  );
+}
+
+function Receive({ wallet }: { wallet: DeviceWallet }) {
+  const { state, notify } = useStore();
+  const url = payUrl(appLink(state), wallet.address);
+  const canShare = typeof navigator.share === "function";
+  return (
+    <Panel title={<><ArrowDownLeft size={15} /> Recibir</>}>
+      <div className="receive">
+        <QrCode value={url} size={168} label="Código QR para enviarte monedas" />
+        <div className="stack">
+          <span className="small muted">
+            Muestra este código: quien lo escanee con la cámara abre el envío con tu dirección ya puesta.
+            También puedes compartir tu nombre o la dirección.
+          </span>
+          <div className="address-box">
+            <code className="mono">{wallet.address}</code>
+            <Button size="sm" icon={<Copy size={12} />} onClick={() => {
+              navigator.clipboard?.writeText(wallet.address).then(() => notify("Dirección copiada"));
+            }}>Copiar</Button>
+          </div>
+          <div className="row-nowrap">
+            {canShare && (
+              <Button size="sm" icon={<Share2 size={12} />} onClick={() => {
+                navigator.share({ title: `Enviar a ${wallet.name}`, url }).catch(() => undefined);
+              }}>Compartir enlace</Button>
+            )}
+            <a className="xs" href={href("billeteras", { w: wallet.name })}>Ver en el explorador</a>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -157,8 +213,19 @@ function SendForm({ wallet, available }: { wallet: DeviceWallet; available: numb
     return list.filter((r) => r.address !== wallet.address);
   }, [state, wallet.address]);
 
+  // Destinatario que viene de un código QR (#/billetera?to=mc…). Se aplica una vez.
+  const toParam = useRoute().params.get("to") ?? "";
+  const applied = useRef("");
+  useEffect(() => {
+    if (!state || applied.current === toParam || !isAddress(toParam) || toParam === wallet.address) return;
+    applied.current = toParam;
+    const known = recipients.find((r) => r.address === toParam);
+    if (known) setTo(known.name);
+    else { setTo("__custom"); setCustom(toParam); }
+  }, [state, toParam, recipients, wallet.address]);
+
   const recipient = to === "__custom" ? custom.trim() : (recipients.find((r) => r.name === to)?.address ?? "");
-  const validRecipient = /^mc[0-9a-f]{40}$/.test(recipient) && recipient !== wallet.address;
+  const validRecipient = isAddress(recipient) && recipient !== wallet.address;
   const tooMuch = amount > available;
 
   const send = async () => {
@@ -203,7 +270,7 @@ function SendForm({ wallet, available }: { wallet: DeviceWallet; available: numb
         {last && (
           <div className="stack-sm">
             <Notice tone="ok" title="Enviada a la red">
-              Queda pendiente hasta que se mine un bloque. <a href={href("transacciones", { tx: last.tx.txid })}>Ver transacción</a>
+              <ConfirmHint /> <a href={href("transacciones", { tx: last.tx.txid })}>Ver transacción</a>
             </Notice>
             <details className="signed-details">
               <summary className="small">Qué firmó este dispositivo</summary>

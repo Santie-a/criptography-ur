@@ -55,7 +55,7 @@ estado), no como una secuencia de pasos:
 
 | Sección | Qué hay |
 |---|---|
-| **Tú · Mi billetera** | Tu billetera en el celular o PC: la clave privada se genera y se queda en el dispositivo; desde aquí se recibe y se envía firmando localmente. |
+| **Tú · Mi billetera** | Tu billetera en el celular o PC: la clave privada se genera y se queda en el dispositivo; desde aquí se recibe (con un código QR) y se envía firmando localmente. Cada billetera nueva recibe monedas de bienvenida. |
 | **Red · Resumen** | Métricas de la red, últimos bloques y transacciones, integridad y alertas de seguridad. |
 | **Red · Bloques** | Tabla de bloques e inspector con encabezado, transacciones, árbol de Merkle y prueba de inclusión. |
 | **Red · Transacciones** | Confirmadas y pendientes; cada una con su firma (r, s), el mensaje firmado y su prueba Merkle. |

@@ -50,11 +50,18 @@ pendiente.
 
 ```bash
 cd frontend && npm install && npm run build && cd ..
-MINICHAIN_HOST=0.0.0.0 python -m server
+MINICHAIN_HOST=0.0.0.0 MINICHAIN_AUTOMINE=20 python -m server
 # los demás abren http://<ip-del-equipo>:8000
 ```
 
-En Windows (PowerShell): `$env:MINICHAIN_HOST="0.0.0.0"; python -m server`.
+En Windows (PowerShell): `$env:MINICHAIN_HOST="0.0.0.0"; $env:MINICHAIN_AUTOMINE="20"; python -m server`.
+
+Para que el público entre, pulsa **Invitar** en el encabezado y proyecta el código
+QR. Con `MINICHAIN_HOST=0.0.0.0`, el servidor adivina la IP del equipo en la red
+local y la pone en el código aunque tú hayas abierto la página en `localhost`. Si
+adivina mal (varias tarjetas de red, VPN), abre la página con la IP correcta o
+define `MINICHAIN_PUBLIC_URL=http://<ip>:8000`. Los celulares deben estar en la
+misma Wi-Fi.
 Para que la red sobreviva si se cierra el servidor, agrega
 `MINICHAIN_STATE_FILE=red.json`.
 
@@ -127,8 +134,12 @@ No hace falta crear tablas: el servidor las crea al arrancar.
    | `MINICHAIN_ADMIN_TOKEN` | Un valor largo y aleatorio, por ejemplo el que imprime `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Márcalo como secreto. **Sin esta variable, cualquiera con la URL controla la red.** |
    | `MINICHAIN_CORS` | vacío (la UI se sirve desde el mismo dominio) |
    | `MINICHAIN_MAX_DIFFICULTY` | `18` (la CPU gratuita es lenta) |
+   | `MINICHAIN_AUTOMINE` | `20` (mina la mempool cada 20 s; así nadie tiene que pulsar Minar) |
+   | `MINICHAIN_FAUCET` | `25` (es el valor por defecto; `0` lo desactiva) |
 
-   `PORT` lo asigna Render y el servidor lo lee solo.
+   `PORT` lo asigna Render y el servidor lo lee solo. Tampoco hace falta
+   `MINICHAIN_PUBLIC_URL`: Render define `RENDER_EXTERNAL_URL` y el código QR de
+   **Invitar** la usa.
 4. **Create Web Service**. El primer despliegue tarda unos minutos (compila la UI
    y la imagen). Al terminar, la aplicación queda en
    `https://<nombre>.onrender.com`.
@@ -166,7 +177,12 @@ En Supabase, *Table Editor → esquema `minichain`* muestra los bloques guardado
    (`MINICHAIN_RATE_LIMIT`).
 3. **El minado y la verificación ocupan CPU.** `MINICHAIN_MAX_DIFFICULTY` limita la
    dificultad por bloque. La validación de la cadena y el análisis de firmas se
-   calculan una vez por bloque nuevo y se comparten entre todos los clientes.
+   calculan una vez por bloque nuevo y se comparten entre todos los clientes. El
+   minado automático solo mina cuando hay transacciones pendientes.
+4. **Monedas de bienvenida.** Salen del saldo de Minera. Si muchas personas se unen
+   a la vez y Minera se queda sin saldo disponible, el registro funciona igual y la
+   página ofrece **Pedir 25** para intentarlo después del siguiente bloque (cada
+   bloque le da 50 a Minera).
 
 ### Detrás de un proxy inverso propio
 

@@ -222,8 +222,8 @@ interfaz y otros clientes. No contiene criptografía propia: todo lo calcula
 |---|---|
 | `__main__.py` | `python -m server`: arranca el servidor (opciones `--host`, `--port`, `--reload`). |
 | `config.py` | Lee la configuración de variables de entorno (puerto, semilla, dificultad, CORS…). |
-| `app.py` | Define todas las rutas de la API (`/api/...`) y el WebSocket de eventos. Valida los datos de entrada y sirve la interfaz compilada en `/`. |
-| `network.py` | El estado compartido: un `Node`, las billeteras custodiadas, los **participantes** (billeteras de dispositivos: solo nombre y clave pública, registrados con una firma) y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
+| `app.py` | Define todas las rutas de la API (`/api/...`) y el WebSocket de eventos. Valida los datos de entrada y sirve la interfaz compilada en `/`. Al arrancar lanza el **bucle de minado automático**: cada segundo pregunta a la red si toca minar y, si mina, avisa a todos los clientes. |
+| `network.py` | El estado compartido: un `Node`, las billeteras custodiadas, los **participantes** (billeteras de dispositivos: solo nombre y clave pública, registrados con una firma) y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias, las **monedas de bienvenida** (Minera envía una transacción firmada; quién ya las recibió se deduce de la propia cadena) y el reloj del minado automático (`automine_tick`). Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
 | `labs.py` | Los laboratorios: curva pequeña (puntos, suma, k·P con traza) y ECDSA paso a paso (firmar, verificar, recuperar). No guardan estado. |
 | `events.py` | El canal de eventos en tiempo real: avisa a todos los navegadores cuando algo cambia. |
 | `security.py` | Los roles: comprueba el token de administrador (`MINICHAIN_ADMIN_TOKEN`) en las rutas que controlan la simulación, y limita las escrituras públicas por IP. Ver [Roles](CONECTAR_UI.md#roles). |
@@ -248,7 +248,8 @@ criptografía.
 | `src/types.ts` | La forma de los datos que devuelve el servidor. |
 | `src/store.tsx` | El estado global: datos de la red, conexión en tiempo real, billetera con la que firma este navegador, alertas de seguridad y diálogos abiertos. |
 | `src/components/shell.tsx` | Encabezado, búsqueda global, navegación lateral y barra de estado. |
-| `src/components/dialogs.tsx` | Los diálogos de transferir, minar, crear billetera e ingresar como administrador. |
+| `src/components/dialogs.tsx` | Los diálogos de invitar (código QR), transferir, minar, crear billetera e ingresar como administrador. |
+| `src/components/share.tsx` | Compartir entre dispositivos: el código QR (dibujado en SVG con [uqr](https://github.com/unjs/uqr)), los enlaces para unirse o pagar (`#/billetera?to=mc…`) y la cuenta regresiva del minado automático. |
 | `src/components/admin.tsx` | El aviso "Requiere administrador" que reemplaza las acciones restringidas. |
 | `src/components/ui.tsx` | Componentes base: paneles, tablas, pestañas, botones, etiquetas, avisos… |
 | `src/components/chain.tsx` | Visualizaciones: la tira de bloques enlazados y el árbol de Merkle. |
@@ -273,6 +274,7 @@ Se ejecutan con `python -m pytest`. Son 80 (una de ellas, la de PostgreSQL, solo
 | `test_server.py` | El flujo completo por la API: estado, bloques, transferir, minar, cliente con clave propia, manipulación sin afectar la red, ataque, defensa, laboratorios, búsqueda y eventos en tiempo real. |
 | `test_auth.py` | Que cada ruta de administrador rechaza peticiones sin token o con un token incorrecto y las acepta con el correcto; que el público puede leer todo y enviar transacciones firmadas con su propia clave, pero no gastar dinero ajeno; el límite de peticiones; y el modo abierto. |
 | `test_device_wallet.py` | Que las firmas hechas en el navegador (fixture generada con `frontend/tests/make-fixture.ts`) verifican con la implementación propia y que el texto firmado es idéntico byte a byte, con acentos, emojis, comillas y saltos de línea. |
+| `test_faucet_automine.py` | Monedas de bienvenida (una sola vez, firmadas por Minera, sin fondos no bloquean el registro, se pueden volver a pedir tras regenerar) y minado automático (ritmo fijo, no mina con la mempool vacía, solo el administrador lo cambia, y el bucle real del servidor mina lo pendiente). |
 | `test_participants.py` | Registro firmado de participantes (rechaza firmas de otra clave o de otro nombre), nombres únicos, una billetera de dispositivo que recibe y envía de punta a punta, y que los registros sobreviven a reinicios y a regenerar la red. |
 | `test_storage.py` | Que la red se guarda y se restaura igual (bloques, mempool, billeteras, versión y el generador de Bob), que un estado guardado alterado se rechaza, que una caída de la base de datos no rompe la red ni sobrescribe lo guardado, y que la validación incremental y el análisis cacheado dan lo mismo que el cálculo completo. Incluye una prueba contra PostgreSQL real. |
 
