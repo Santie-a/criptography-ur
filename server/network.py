@@ -70,6 +70,9 @@ TAMPER_ACTIONS = {
 # de bienvenida a cada participante nuevo (un "faucet").
 FAUCET_WALLET = "Minera"
 FAUCET_MEMO = "bienvenida"
+# Las billeteras del escenario no se pueden eliminar: la historia y el ataque dependen de ellas.
+SCENARIO_WALLETS = frozenset({"Alice", "Bob", "Carol", "Minera", "Mallory"})
+MAX_BANNED = 5000
 
 
 class Network:
@@ -99,6 +102,9 @@ class Network:
         # El servidor solo conoce su nombre y su clave pública, nunca la privada.
         # dirección -> {"name", "pubkey", "joined"}
         self.participants: dict[str, dict] = {}
+        # Claves eliminadas por el administrador: no pueden volver a registrarse
+        # ni enviar transacciones a este servidor. clave pública -> {"name", "at"}
+        self.banned: dict[str, dict] = {}
         self._clear_caches()
         if not self._restore():
             self.reset(params or ScenarioParams())
@@ -115,6 +121,7 @@ class Network:
                          "nonce": nonce_to_dict(w.nonce_fn)} for w in self.wallets.values()],
             "mempool": [tx.to_dict() for tx in self.node.mempool],
             "participants": [{"address": a, **p} for a, p in self.participants.items()],
+            "banned": [{"pubkey": k, **b} for k, b in self.banned.items()],
         }
 
     def _persist(self) -> None:
@@ -167,12 +174,14 @@ class Network:
             params = ScenarioParams(**state["params"])
             participants = {p["address"]: {"name": p["name"], "pubkey": p["pubkey"], "joined": p["joined"]}
                             for p in state.get("participants", [])}
+            banned = {b["pubkey"]: {"name": b["name"], "at": b["at"]} for b in state.get("banned", [])}
         except Exception as exc:  # noqa: BLE001
             log.error("estado guardado inválido, se genera una red nueva: %s", exc)
             return False
         with self.lock:
             self.params, self.node, self.wallets = params, node, wallets
             self.participants = participants
+            self.banned = banned
             self.version = int(state["version"])
             self._persisted_blocks = len(chain.blocks)
             self._replace_pending = False
@@ -193,7 +202,7 @@ class Network:
 
     # ------------------------------------------------------------ escenario
 
-    def reset(self, params: ScenarioParams) -> None:
+    def reset(self, params: ScenarioParams, clear_participants: bool = False) -> None:
         if params.victim_nonce not in NONCE_KINDS:
             raise BadRequest(f"estrategia desconocida: {params.victim_nonce}")
         scenario = build_scenario(seed=params.seed, difficulty=params.difficulty,
@@ -206,6 +215,10 @@ class Network:
             self.params = params
             self.node = Node(scenario.chain)
             self.wallets: dict[str, Wallet] = dict(scenario.wallets)
+            if clear_participants:
+                for p in list(self.participants.values()):
+                    self._ban(p["pubkey"], p["name"])
+                self.participants = {}
             self._clear_caches()
             self._replace_pending = True
             self.restored = False
@@ -272,6 +285,9 @@ class Network:
             raise BadRequest("la clave pública debe ir comprimida (33 bytes)")
         if not verify(Q, self.registration_message(name, pubkey_hex), sig):
             raise BadRequest("la firma del registro no corresponde a esa clave pública")
+        if pubkey_hex in self.banned:
+            raise BadRequest("el administrador eliminó esta billetera de la red: su clave está bloqueada. "
+                             "Olvídala en este dispositivo y crea una nueva")
         address = address_from_pubkey(bytes.fromhex(pubkey_hex))
         with self.lock:
             if self._name_taken(name, except_address=address):
@@ -331,6 +347,70 @@ class Network:
         with self.lock:
             return self._faucet(address.strip())
 
+    # ------------------------------------------------------------ eliminar y bloquear
+    #
+    # Lo que se elimina es el registro (nombre y clave) y lo pendiente. Las
+    # transacciones ya minadas no se tocan: borrarlas rompería la cadena, que es
+    # justo lo que el validador detecta. El bloqueo es una política de este
+    # servidor (como la de la mempool de un nodo real), no una regla de validez:
+    # la cadena sigue siendo válida para cualquiera que la revise.
+
+    def _ban(self, pubkey_hex: str, name: str) -> None:
+        if pubkey_hex not in self.banned and len(self.banned) >= MAX_BANNED:
+            raise BadRequest("se alcanzó el máximo de claves bloqueadas; desbloquea algunas primero")
+        self.banned[pubkey_hex] = {"name": name, "at": int(time.time())}
+
+    def _drop_pending_from(self, pubkey_hex: str) -> int:
+        before = len(self.node.mempool)
+        with self.node.lock:
+            self.node.mempool = [tx for tx in self.node.mempool if tx.sender != pubkey_hex]
+            self.node._prune()  # recalcula saldos pendientes y descarta lo que dependía de ellas
+        return before - len(self.node.mempool)
+
+    def delete_participant(self, address: str) -> dict:
+        """Elimina una billetera de dispositivo y bloquea su clave."""
+        with self.lock:
+            p = self.participants.get(address)
+            if p is None:
+                raise NotFound("no existe esa billetera de dispositivo")
+            self._ban(p["pubkey"], p["name"])
+            del self.participants[address]
+            dropped = self._drop_pending_from(p["pubkey"])
+            self._changed()
+            return {"name": p["name"], "address": address, "dropped_pending": dropped, "banned": True}
+
+    def delete_wallet(self, name: str) -> dict:
+        """Elimina una billetera custodiada creada por el administrador (no las del escenario).
+
+        El servidor olvida su clave privada: lo que tenga queda inutilizable.
+        """
+        with self.lock:
+            wallet = self.wallet(name)
+            if name in SCENARIO_WALLETS:
+                raise BadRequest(f"{name} es parte del escenario y no se puede eliminar")
+            self._ban(wallet.pubkey_hex, name)
+            del self.wallets[name]
+            dropped = self._drop_pending_from(wallet.pubkey_hex)
+            self._changed()
+            return {"name": name, "address": wallet.address, "dropped_pending": dropped, "banned": True}
+
+    def unban(self, pubkey_hex: str | None = None) -> dict:
+        """Desbloquea una clave, o todas si no se indica ninguna."""
+        with self.lock:
+            if pubkey_hex is None:
+                count = len(self.banned)
+                self.banned = {}
+            else:
+                if self.banned.pop(pubkey_hex.lower(), None) is None:
+                    raise NotFound("esa clave no está bloqueada")
+                count = 1
+            self._changed()
+            return {"unbanned": count}
+
+    def banned_json(self) -> list[dict]:
+        return [{"pubkey": k, "address": address_from_pubkey(bytes.fromhex(k)), **b}
+                for k, b in self.banned.items()]
+
     def participant_json(self, address: str, welcomed: set[str] | None = None) -> dict:
         p = self.participants[address]
         if welcomed is None:
@@ -345,6 +425,7 @@ class Network:
             "nonce": "rfc6979",
             "nonce_label": "RFC 6979, en el dispositivo",
             "custody": "dispositivo",
+            "deletable": True,
             "joined": p["joined"],
             "welcomed": address in welcomed,
         }
@@ -399,6 +480,7 @@ class Network:
             "nonce": w.nonce_kind,
             "nonce_label": NONCE_KINDS.get(w.nonce_kind, w.nonce_kind),
             "custody": "servidor",
+            "deletable": w.name not in SCENARIO_WALLETS,
         }
 
     # ------------------------------------------------------------ transacciones
@@ -416,6 +498,8 @@ class Network:
         except (KeyError, ValueError, TypeError) as exc:
             raise BadRequest(f"transacción mal formada: {exc}") from None
         with self.lock:
+            if tx.sender in self.banned:
+                raise BadRequest("la clave del emisor fue bloqueada por el administrador de este servidor")
             return self._submit(tx)
 
     def _submit(self, tx: Transaction) -> dict:
@@ -644,6 +728,7 @@ class Network:
                 "storage": self.storage_info(),
                 "faucet": {"amount": self.faucet_amount, "wallet": FAUCET_WALLET},
                 "automine": self.automine_info(),
+                "banned": self.banned_json(),
             }
 
     def export_chain(self) -> dict:

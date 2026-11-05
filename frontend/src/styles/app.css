@@ -490,3 +490,10 @@ svg.qr { display: block; flex: none; background: #fff; }
   .receive { grid-template-columns: minmax(0, 1fr); justify-items: center; }
   .receive .stack { width: 100%; }
 }
+
+/* En pantallas angostas, las acciones de un aviso bajan a su propia fila. */
+@media (max-width: 760px) {
+  .notice { flex-wrap: wrap; }
+  .notice > .stack-sm { flex: 1 1 0; min-width: 0; }
+  .notice .actions { flex-basis: 100%; margin-left: 28px; }
+}

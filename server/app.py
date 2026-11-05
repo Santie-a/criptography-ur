@@ -40,6 +40,8 @@ class ResetRequest(BaseModel):
     entropy_bits: int = Field(3, ge=1, le=16)
     n_blocks: int = Field(5, ge=1, le=12)
     tx_per_block: int = Field(4, ge=1, le=8)
+    clear_participants: bool = Field(False, description="borrar también las billeteras de dispositivos "
+                                                         "(sus claves quedan bloqueadas)")
 
 
 class WalletRequest(BaseModel):
@@ -232,7 +234,8 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
 
     @app.post("/api/reset", tags=["red"], summary="Regenerar el escenario simulado", dependencies=admin)
     async def reset(req: ResetRequest):
-        await run_in_threadpool(net.reset, ScenarioParams(**req.model_dump()))
+        params = ScenarioParams(**req.model_dump(exclude={"clear_participants"}))
+        await run_in_threadpool(net.reset, params, req.clear_participants)
         await changed("reset")
         return await run_in_threadpool(net.state, bus.clients)
 
@@ -289,6 +292,34 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         w = await run_in_threadpool(net.create_wallet, req.name, req.nonce, req.entropy_bits)
         await changed("wallet", name=w["name"])
         return w
+
+    @app.delete("/api/wallets/{name}", tags=["billeteras"], dependencies=admin,
+                summary="Eliminar una billetera custodiada creada por el administrador (bloquea su clave)")
+    async def delete_wallet(name: str):
+        result = await run_in_threadpool(net.delete_wallet, name)
+        await changed("wallet", name=name)
+        return result
+
+    @app.delete("/api/participants/{address}", tags=["billeteras"], dependencies=admin,
+                summary="Eliminar una billetera de dispositivo y bloquear su clave")
+    async def delete_participant(address: str):
+        result = await run_in_threadpool(net.delete_participant, address)
+        await changed("participant", name=result["name"])
+        return result
+
+    @app.delete("/api/banned", tags=["billeteras"], dependencies=admin,
+                summary="Desbloquear todas las claves eliminadas")
+    async def unban_all():
+        result = await run_in_threadpool(net.unban, None)
+        await changed("wallet")
+        return result
+
+    @app.delete("/api/banned/{pubkey}", tags=["billeteras"], dependencies=admin,
+                summary="Desbloquear una clave eliminada")
+    async def unban(pubkey: str):
+        result = await run_in_threadpool(net.unban, pubkey)
+        await changed("wallet")
+        return result
 
     @app.put("/api/wallets/{name}/nonce", tags=["billeteras"], summary="Cambiar la estrategia de nonce", dependencies=admin)
     async def set_nonce(name: str, req: NonceRequest):

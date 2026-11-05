@@ -75,9 +75,9 @@ público con límite de peticiones por IP.
 | Método | Ruta | Rol | Para qué |
 |---|---|---|---|
 | GET | `/api/health` | público | Estado del servidor, del almacenamiento y del rol de quien pregunta |
-| GET | `/api/state` | público | Billeteras, mempool, resumen de bloques, parámetros, rol, minado automático (`automine`), monedas de bienvenida (`faucet`) y enlaces para invitar (`public_url`, `lan_url`) |
+| GET | `/api/state` | público | Billeteras, mempool, resumen de bloques, parámetros, rol, minado automático (`automine`), monedas de bienvenida (`faucet`) y enlaces para invitar (`public_url`, `lan_url`), claves bloqueadas (`banned`) |
 | GET | `/api/admin/check` | admin | Comprobar un token |
-| POST | `/api/reset` | admin | Regenerar el escenario (semilla, dificultad, nonce de Bob…) |
+| POST | `/api/reset` | admin | Regenerar el escenario (semilla, dificultad, nonce de Bob…). Con `"clear_participants": true` también elimina y bloquea las billeteras de dispositivos |
 | GET | `/api/search?q=` | público | Búsqueda global: bloque, txid, billetera o dirección |
 | GET | `/api/blocks/{i}` | público | Bloque con transacciones y niveles del árbol de Merkle |
 | GET | `/api/blocks/{i}/proof/{tx}` | público | Prueba de inclusión Merkle |
@@ -90,6 +90,9 @@ público con límite de peticiones por IP.
 | GET | `/api/accounts/{dirección}` | público | Saldo, disponible y siguiente `seq` de cualquier dirección (lo que necesita un dispositivo para firmar) |
 | POST | `/api/wallets` | admin | Crear una billetera custodiada por el servidor |
 | PUT | `/api/wallets/{nombre}/nonce` | admin | Cambiar su estrategia de nonce |
+| DELETE | `/api/wallets/{nombre}` | admin | Eliminar una billetera custodiada creada por el administrador (no las cinco del escenario). Descarta sus pendientes y bloquea su clave |
+| DELETE | `/api/participants/{dirección}` | admin | Eliminar una billetera de dispositivo. Descarta sus pendientes y bloquea su clave |
+| DELETE | `/api/banned/{clave pública}` | admin | Desbloquear una clave (sin `{clave}`, todas) |
 | POST | `/api/transactions/transfer` | admin | El servidor firma con una billetera custodiada |
 | POST | `/api/transactions` | **límite** | Enviar una transacción firmada por el cliente: la firma es la autorización |
 | POST | `/api/mine` | admin | Minar un bloque con la mempool |

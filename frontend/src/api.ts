@@ -64,6 +64,14 @@ async function request<T>(method: string, path: string, body?: unknown, token = 
   return data as T;
 }
 
+export interface DeleteResult {
+  name: string;
+  address: string;
+  /** Transacciones pendientes suyas que se descartaron. */
+  dropped_pending: number;
+  banned: boolean;
+}
+
 const get = <T>(path: string) => request<T>("GET", path);
 const post = <T>(path: string, body: unknown = {}) => request<T>("POST", path, body);
 const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
@@ -73,7 +81,8 @@ export const api = {
   state: () => get<NetworkState>("/api/state"),
   /** Comprueba un token sin guardarlo. */
   checkAdmin: (token: string) => request<{ ok: boolean }>("GET", "/api/admin/check", undefined, token),
-  reset: (params: Partial<ScenarioParams>) => post<NetworkState>("/api/reset", params),
+  reset: (params: Partial<ScenarioParams>, clearParticipants = false) =>
+    post<NetworkState>("/api/reset", { ...params, clear_participants: clearParticipants }),
   block: (i: number) => get<BlockDetail>(`/api/blocks/${i}`),
   proof: (i: number, tx: number) => get<MerkleProof>(`/api/blocks/${i}/proof/${tx}`),
   exportChain: () => get<unknown>("/api/chain/export"),
@@ -91,6 +100,10 @@ export const api = {
     post<Tx>("/api/transactions", tx),
   // billeteras y transacciones
   createWallet: (name: string, nonce: NonceKind) => post<Wallet>("/api/wallets", { name, nonce }),
+  deleteWallet: (name: string) => request<DeleteResult>("DELETE", `/api/wallets/${encodeURIComponent(name)}`),
+  deleteParticipant: (address: string) => request<DeleteResult>("DELETE", `/api/participants/${address}`),
+  /** Sin clave: desbloquea todas. */
+  unban: (pubkey?: string) => request<{ unbanned: number }>("DELETE", pubkey ? `/api/banned/${pubkey}` : "/api/banned"),
   setNonce: (name: string, nonce: NonceKind) =>
     put<Wallet>(`/api/wallets/${encodeURIComponent(name)}/nonce`, { nonce }),
   transfer: (sender: string, recipient: string, amount: number, memo: string) =>

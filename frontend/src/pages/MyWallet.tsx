@@ -111,16 +111,30 @@ function Onboarding({ onCreated }: { onCreated: (w: DeviceWallet) => boolean }) 
 function WalletView({ wallet, onForget }: { wallet: DeviceWallet; onForget: () => void }) {
   const { state, notify, run } = useStore();
   const me = state?.participants.find((p) => p.address === wallet.address);
+  const banned = state?.banned.some((b) => b.pubkey === wallet.pubkey) ?? false;
   const [registerError, setRegisterError] = useState<string | null>(null);
   const tried = useRef(false);
 
   // Si el servidor no conoce esta billetera (red regenerada, servidor sin
   // persistencia...), se vuelve a registrar sola: la clave está aquí.
   useEffect(() => {
-    if (!state || me || tried.current) return;
+    if (!state || me || banned || tried.current) return;
     tried.current = true;
     register(wallet).catch((e) => setRegisterError(e instanceof Error ? e.message : String(e)));
-  }, [state, me, wallet]);
+  }, [state, me, banned, wallet]);
+
+  if (banned) {
+    return (
+      <div className="wallet-grid">
+        <Notice tone="bad" title="El administrador eliminó esta billetera de la red"
+          actions={<Button size="sm" variant="danger" icon={<Trash2 size={14} />} onClick={onForget}>Olvidar y crear otra</Button>}>
+          Su clave quedó bloqueada en este servidor: no puede registrarse ni enviar transacciones. Lo que ya se minó
+          sigue en la cadena, pero desde aquí no se puede usar. Si fue un error, el administrador puede desbloquearla
+          en Escenario.
+        </Notice>
+      </div>
+    );
+  }
 
   return (
     <div className="wallet-grid">

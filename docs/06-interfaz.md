@@ -241,7 +241,29 @@ mensaje para calcular z) está a la vista de cualquiera
 |---|---|
 | **Botón Nueva billetera** *(administrador)* | Crea una billetera de la simulación, custodiada por el servidor. |
 | **Tabla** | Todas las billeteras. La columna **Clave en** dice dónde vive la clave privada: **servidor** (las de la simulación: Alice, Bob, Carol…) o **dispositivo** (las de los participantes). Además: dirección, saldo confirmado, disponible (descontando lo pendiente), próximo seq, estrategia de nonce y estado ("clave expuesta" si aplica). |
-| **Inspector** | Saldo, cuántas firmas publicó, dirección y clave pública (la privada nunca se muestra), la estrategia de nonce (el administrador la puede cambiar en las billeteras del servidor) y el historial. El botón **Usar** cambia la billetera con la que firma el administrador. |
+| **Inspector** | Saldo, cuántas firmas publicó, dirección y clave pública (la privada nunca se muestra), la estrategia de nonce (el administrador la puede cambiar en las billeteras del servidor) y el historial. El botón **Usar** cambia la billetera con la que firma el administrador. Al final, **Eliminar billetera** *(administrador)*. |
+
+### Eliminar billeteras de prueba
+
+**Eliminar billetera** aparece en el inspector de las billeteras de dispositivos y de
+las que creó el administrador con **Nueva billetera**. Las cinco del escenario
+(Alice, Bob, Carol, Minera y Mallory) no se pueden eliminar. Pide confirmación y:
+
+- borra el nombre del registro y descarta sus transacciones **pendientes**;
+- **bloquea su clave**: no puede volver a registrarse, ni con otro nombre, ni
+  enviar transacciones a este servidor. En su celular aparece "El administrador
+  eliminó esta billetera" con un botón para olvidarla y crear otra;
+- **no toca lo ya minado**. Borrar una transacción confirmada cambiaría la raíz de
+  Merkle y rompería el enlace con el bloque siguiente, que es justo lo que detecta
+  la página Integridad. Esas transacciones siguen ahí y muestran la dirección sin
+  nombre;
+- en una billetera del servidor, el servidor olvida su clave privada: lo que tenga
+  queda inutilizable.
+
+El bloqueo es una regla de **este servidor**, como la política de mempool de un nodo
+real, no una regla de validez: la cadena sigue siendo válida para cualquiera que la
+revise. Las claves bloqueadas se ven y se desbloquean en
+[Escenario](#611-escenario).
 
 **Qué concepto ilustra:** que la clave pública es pública y la privada no; y que la
 estrategia de nonce es una decisión de la billetera, no de la red. Cambiarla solo
@@ -374,6 +396,7 @@ regenerar nada:
 |---|---|
 | **Minado automático** | Apagado, o cada 10, 20, 30 o 60 segundos. El servidor mina la mempool a ese ritmo, con la recompensa para Minera. Si no hay nada pendiente, no mina (no se llenan bloques vacíos). Al reiniciar el servidor vuelve al valor de `MINICHAIN_AUTOMINE`. |
 | **Monedas de bienvenida** | Solo informativo: cuánto recibe cada billetera de dispositivo nueva. Se configura con `MINICHAIN_FAUCET`. |
+| **Claves bloqueadas** | Las billeteras eliminadas, con un botón **Desbloquear** cada una (y **Desbloquear todas**). Una clave desbloqueada vuelve a registrarse sola la próxima vez que su dueño abra Mi billetera. |
 
 Debajo, los parámetros del escenario, que solo se aplican al regenerar:
 
@@ -388,6 +411,9 @@ Debajo, los parámetros del escenario, que solo se aplican al regenerar:
 
 El botón **Regenerar** reemplaza la red **para todos los clientes conectados**:
 se pierden los bloques, transacciones y billeteras creadas desde la última vez.
+Las billeteras de dispositivos siguen registradas con saldo 0, salvo que se marque
+**Eliminar también las billeteras de dispositivos**: entonces se eliminan y sus
+claves quedan bloqueadas, para empezar la clase con el registro vacío.
 
 ---
 

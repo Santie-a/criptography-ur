@@ -14,6 +14,16 @@ export interface Wallet {
   nonce_label: string;
   /** servidor: billetera de la simulación; dispositivo: la clave vive en un celular o PC. */
   custody: "servidor" | "dispositivo";
+  /** El administrador puede eliminarla (todas menos las cinco del escenario). */
+  deletable: boolean;
+}
+
+/** Clave eliminada por el administrador: no puede registrarse ni enviar a este servidor. */
+export interface BannedKey {
+  pubkey: string;
+  address: string;
+  name: string;
+  at: number;
 }
 
 export interface Participant extends Wallet {
@@ -110,6 +120,7 @@ export interface NetworkState {
   public_url: string | null;
   /** URL adivinada en la red local, si el servidor escucha en 0.0.0.0. */
   lan_url: string | null;
+  banned: BannedKey[];
 }
 
 export interface MerkleProof {

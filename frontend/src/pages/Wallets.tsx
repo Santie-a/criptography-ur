@@ -1,10 +1,40 @@
-import { Plus, UserCheck } from "lucide-react";
+import { Plus, Trash2, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { Button, Hex, Inspector, NonceTag, Notice, PageHeader, Panel, Section, Tag, initials } from "../components/ui";
+import { AsyncButton, Button, Hex, Inspector, NonceTag, Notice, PageHeader, Panel, Section, Tag, initials } from "../components/ui";
 import { go, href, useRoute } from "../router";
 import { useStore } from "../store";
 import type { NonceKind, WalletDetail } from "../types";
+
+/** Eliminar una billetera de prueba, con confirmación. Solo el administrador. */
+function DeleteWallet({ detail }: { detail: WalletDetail }) {
+  const { run, notify } = useStore();
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => setConfirm(false), [detail.name]);
+  const device = detail.custody === "dispositivo";
+  if (!confirm) {
+    return <Button variant="ghost" icon={<Trash2 size={14} />} onClick={() => setConfirm(true)}>Eliminar billetera</Button>;
+  }
+  return (
+    <Notice tone="bad" title={`¿Eliminar a ${detail.name}?`}
+      actions={<div className="row-nowrap">
+        <Button size="sm" onClick={() => setConfirm(false)}>Cancelar</Button>
+        <AsyncButton size="sm" variant="danger" onRun={async () => {
+          const r = await run(() => device ? api.deleteParticipant(detail.address) : api.deleteWallet(detail.name));
+          if (!r) return;
+          notify(`${r.name} eliminada${r.dropped_pending ? ` y ${r.dropped_pending} pendientes descartadas` : ""}. Su clave quedó bloqueada.`);
+          go("billeteras");
+        }}>Eliminar</AsyncButton>
+      </div>}>
+      <ul className="bullet small">
+        <li>Se borra su nombre del registro y se descartan sus transacciones pendientes.</li>
+        <li>Su clave queda bloqueada: no puede volver a registrarse ni enviar a este servidor. Se desbloquea en Escenario.</li>
+        <li>Lo ya minado sigue en la cadena: borrarlo la rompería. Esas transacciones mostrarán la dirección sin nombre.</li>
+        {!device && <li>El servidor olvida su clave privada: lo que tenga queda inutilizable.</li>}
+      </ul>
+    </Notice>
+  );
+}
 
 export function Wallets() {
   const { state, scan, identity, setIdentity, run, notify, openDialog, isAdmin } = useStore();
@@ -111,6 +141,11 @@ export function Wallets() {
                 </table>
               </div>
             </Section>
+            {isAdmin && detail.deletable && (
+              <Section title="Eliminar">
+                <DeleteWallet detail={detail} />
+              </Section>
+            )}
           </Inspector>
         )}
       </div>

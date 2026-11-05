@@ -1,10 +1,10 @@
 // Escenario: página de configuración (etiqueta y descripción a la izquierda,
 // control a la derecha) con una sola acción destructiva al final.
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Unlock } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { AdminRequired } from "../components/admin";
-import { AsyncButton, Notice, PageHeader, Panel } from "../components/ui";
+import { AsyncButton, Button, Notice, PageHeader, Panel, fmtTime } from "../components/ui";
 import { useStore } from "../store";
 import type { NonceKind, ScenarioParams } from "../types";
 
@@ -51,6 +51,32 @@ function LiveSettings() {
       </>}>
         <span className="num">{state.faucet.amount ? `${state.faucet.amount} monedas` : "Desactivadas"}</span>
       </Row>
+      <Row title="Claves bloqueadas" desc={<>
+        Billeteras eliminadas por el administrador. No pueden volver a registrarse ni enviar transacciones a este
+        servidor. Es una regla del servidor, no de la cadena: lo que ya minaron sigue siendo válido.
+      </>}>
+        {state.banned.length === 0 ? <span className="muted small">Ninguna</span> : (
+          <div className="stack-sm">
+            {state.banned.map((b) => (
+              <div key={b.pubkey} className="row-nowrap" style={{ justifyContent: "space-between" }}>
+                <span className="small truncate" title={b.address}>{b.name} <span className="xs faint">· {fmtTime(b.at)}</span></span>
+                {isAdmin && (
+                  <Button size="sm" variant="ghost" icon={<Unlock size={12} />} onClick={async () => {
+                    const r = await run(() => api.unban(b.pubkey));
+                    if (r) notify(`Clave de ${b.name} desbloqueada`);
+                  }}>Desbloquear</Button>
+                )}
+              </div>
+            ))}
+            {isAdmin && state.banned.length > 1 && (
+              <AsyncButton size="sm" icon={<Unlock size={12} />} onRun={async () => {
+                const r = await run(() => api.unban());
+                if (r) notify(`${r.unbanned} claves desbloqueadas`);
+              }}>Desbloquear todas</AsyncButton>
+            )}
+          </div>
+        )}
+      </Row>
     </Panel>
   );
 }
@@ -58,6 +84,7 @@ function LiveSettings() {
 export function Scenario() {
   const { state, setState, run, notify, isAdmin } = useStore();
   const [form, setForm] = useState<ScenarioParams | null>(null);
+  const [clearDevices, setClearDevices] = useState(false);
   useEffect(() => {
     if (state && !form) setForm(state.params);
   }, [state, form]);
@@ -106,10 +133,22 @@ export function Scenario() {
 
         {isAdmin && <Notice tone="warn" title="Regenerar reemplaza la red para todos los clientes conectados"
           actions={<AsyncButton variant="danger" icon={<RotateCcw size={14} />} onRun={async () => {
-            const s = await run(() => api.reset(form));
-            if (s) { setState(s); setForm(s.params); notify("Red regenerada"); }
+            const s = await run(() => api.reset(form, clearDevices));
+            if (s) {
+              setState(s); setForm(s.params); setClearDevices(false);
+              notify(clearDevices ? "Red regenerada y billeteras de dispositivos eliminadas" : "Red regenerada");
+            }
           }}>{dirty ? "Aplicar y regenerar" : "Regenerar"}</AsyncButton>}>
-          Se pierden los bloques, transacciones y billeteras creadas desde la última generación.
+          <div className="stack-sm">
+            <span>Se pierden los bloques, transacciones y billeteras creadas desde la última generación.</span>
+            <label className="row-nowrap small" style={{ cursor: "pointer" }}>
+              <input type="checkbox" checked={clearDevices} onChange={(e) => setClearDevices(e.target.checked)} />
+              <span>
+                Eliminar también las {state.participants.length} billeteras de dispositivos (sus claves quedan
+                bloqueadas). Sin marcar, siguen registradas con saldo 0.
+              </span>
+            </label>
+          </div>
         </Notice>}
       </div>
     </>
