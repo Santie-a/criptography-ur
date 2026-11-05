@@ -137,3 +137,38 @@ def nonce_kind(fn: NonceFn) -> str:
     if isinstance(fn, ConstantNonce):
         return "constant"
     return "custom"
+
+
+def nonce_to_dict(fn: NonceFn) -> dict:
+    """Estado serializable de una estrategia, para guardarla y restaurarla.
+
+    Para el RNG defectuoso se guarda también el estado interno del generador:
+    así, tras reiniciar el servidor, sigue produciendo la misma secuencia (y
+    las colisiones de la simulación siguen siendo reproducibles).
+    """
+    kind = nonce_kind(fn)
+    if kind == "weak":
+        version, internal, gauss = fn._rng.getstate()
+        return {"kind": kind, "entropy_bits": fn.entropy_bits,
+                "rng_state": [version, list(internal), gauss]}
+    if kind == "constant":
+        return {"kind": kind, "k": fn.k}
+    if kind in ("rfc6979", "random"):
+        return {"kind": kind}
+    raise ValueError("estrategia de nonce no serializable")
+
+
+def nonce_from_dict(data: dict) -> NonceFn:
+    kind = data["kind"]
+    if kind == "rfc6979":
+        return rfc6979_nonce
+    if kind == "random":
+        return random_nonce
+    if kind == "constant":
+        return ConstantNonce(int(data["k"]))
+    if kind == "weak":
+        fn = WeakRNGNonce(int(data["entropy_bits"]))
+        version, internal, gauss = data["rng_state"]
+        fn._rng.setstate((version, tuple(internal), gauss))
+        return fn
+    raise ValueError(f"estrategia de nonce desconocida: {kind}")

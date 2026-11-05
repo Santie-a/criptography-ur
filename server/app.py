@@ -5,6 +5,8 @@ Documentación interactiva generada automáticamente en /api/docs.
 
 from __future__ import annotations
 
+import threading
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -18,6 +20,7 @@ from . import labs
 from .config import Settings, settings as default_settings
 from .events import EventBus
 from .network import BadRequest, Network, NotFound, ScenarioParams, TAMPER_ACTIONS
+from .storage import storage_from_env
 
 NonceKind = Literal["rfc6979", "random", "weak", "constant"]
 
@@ -124,14 +127,23 @@ class VerifyRequest(BaseModel):
 # ------------------------------------------------------------------ app
 
 def create_app(settings: Settings = default_settings, network: Network | None = None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Al arrancar (o despertar en Render) se precalculan validación y
+        # análisis en segundo plano, sin bloquear las primeras peticiones.
+        threading.Thread(target=app.state.network.warm_up, daemon=True).start()
+        yield
+
     app = FastAPI(title="minichain API", version="1.0.0",
                   description="Mini-blockchain con ECDSA sobre secp256k1 y el ataque por nonce repetido.",
-                  docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
+                  docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None,
+                  lifespan=lifespan)
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                            allow_methods=["*"], allow_headers=["*"])
 
-    net = network or Network(ScenarioParams(seed=settings.seed, difficulty=settings.difficulty))
+    net = network or Network(ScenarioParams(seed=settings.seed, difficulty=settings.difficulty),
+                             storage_from_env(settings.database_url, settings.state_file))
     bus = EventBus()
     app.state.network = net
     app.state.bus = bus
@@ -151,7 +163,7 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
 
     @app.get("/api/health", tags=["red"])
     async def health():
-        return {"ok": True, "version": net.version, "clients": bus.clients}
+        return {"ok": True, "version": net.version, "clients": bus.clients, "storage": net.storage_info()}
 
     @app.get("/api/state", tags=["red"], summary="Billeteras, mempool y resumen de bloques")
     async def state():

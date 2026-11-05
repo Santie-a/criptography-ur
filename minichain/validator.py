@@ -62,10 +62,16 @@ class ValidationReport:
         return not self.issues
 
 
-def check_transaction(tx: Transaction, ledger: Ledger) -> tuple[str, str] | None:
+def check_transaction(tx: Transaction, ledger: Ledger,
+                      verify_signature: bool = True) -> tuple[str, str] | None:
     """Valida una transacción firmada contra el estado actual.
 
     Devuelve (tipo, detalle) del problema, o None si es válida (y la aplica).
+
+    `verify_signature=False` omite solo la verificación ECDSA (la parte cara).
+    Se usa con datos que ya se verificaron antes y no pudieron cambiar: la
+    mempool del propio nodo al minar, o la cadena guardada por el propio
+    servidor al restaurarla. Nunca con datos que llegan de afuera.
     """
     if tx.is_coinbase:
         return ("coinbase", "transacción sin firma fuera de su lugar")
@@ -77,7 +83,7 @@ def check_transaction(tx: Transaction, ledger: Ledger) -> tuple[str, str] | None
         Q = tx.sender_point()
     except ValueError as exc:
         return ("firma", f"clave pública inválida: {exc}")
-    if not verify(Q, tx.payload(), tx.signature):
+    if verify_signature and not verify(Q, tx.payload(), tx.signature):
         return ("firma", "la firma ECDSA no verifica")
     sender = tx.sender_address
     if tx.seq != ledger.next_seq(sender):
@@ -91,10 +97,12 @@ def check_transaction(tx: Transaction, ledger: Ledger) -> tuple[str, str] | None
 
 
 def validate_block(block: Block, prev: Block | None, ledger: Ledger,
-                   required_difficulty: int) -> tuple[list[Issue], int]:
+                   required_difficulty: int,
+                   verify_signatures: bool = True) -> tuple[list[Issue], int]:
     """Valida un bloque y aplica sus transacciones válidas a `ledger`.
 
-    Devuelve (problemas, firmas verificadas).
+    Devuelve (problemas, firmas verificadas). Ver `check_transaction` sobre
+    `verify_signatures`.
     """
     issues: list[Issue] = []
     i = block.index
@@ -141,8 +149,8 @@ def validate_block(block: Block, prev: Block | None, ledger: Ledger,
             else:
                 ledger.balances[tx.recipient] += tx.amount
             continue
-        signatures += 1
-        problem = check_transaction(tx, ledger)
+        signatures += 1 if verify_signatures else 0
+        problem = check_transaction(tx, ledger, verify_signatures)
         if problem is not None:
             issues.append(Issue(i, j, *problem))
 

@@ -151,7 +151,9 @@ Ejemplo: mostrar cuántos bits en cero tiene cada hash de bloque.
 | Variable | Por defecto | Uso |
 |---|---|---|
 | `MINICHAIN_HOST` | `127.0.0.1` | `0.0.0.0` para aceptar conexiones de otras máquinas |
-| `MINICHAIN_PORT` | `8000` | Puerto del servidor |
+| `PORT` o `MINICHAIN_PORT` | `8000` | Puerto del servidor (Render asigna `PORT`) |
+| `DATABASE_URL` | vacío | PostgreSQL donde se guarda la red (Supabase, *session pooler*) |
+| `MINICHAIN_STATE_FILE` | vacío | Alternativa local: guardar la red en un archivo JSON |
 | `MINICHAIN_SEED` | `2026` | Semilla del escenario inicial |
 | `MINICHAIN_DIFFICULTY` | `14` | Dificultad inicial (bits) |
 | `MINICHAIN_MAX_DIFFICULTY` | `22` | Máximo por bloque, para que nadie bloquee el servidor |

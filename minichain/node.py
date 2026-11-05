@@ -62,16 +62,25 @@ class Node:
                 timestamp = max(int(time.time()), self.chain.tip.timestamp + 1)
             if difficulty is not None and difficulty < self.chain.difficulty:
                 raise ValueError(f"la dificultad mínima de la red es {self.chain.difficulty}")
-            block, attempts = self.chain.mine_block(batch, miner_address, timestamp, difficulty)
+            # Las firmas de la mempool ya se verificaron al entrar (submit) y los
+            # objetos no cambian: no hace falta verificarlas otra vez al minar.
+            block, attempts = self.chain.mine_block(batch, miner_address, timestamp, difficulty,
+                                                    verify_signatures=False)
             self.mempool = self.mempool[len(batch):]
             self._prune()
             return block, attempts
 
     def _prune(self) -> None:
-        """Descarta de la mempool lo que dejó de ser válido."""
+        """Descarta de la mempool lo que dejó de ser válido (seq o saldo)."""
         ledger = self.chain.ledger.copy()
-        self.mempool = [tx for tx in self.mempool if check_transaction(tx, ledger) is None]
+        self.mempool = [tx for tx in self.mempool if check_transaction(tx, ledger, False) is None]
         self.pending = ledger
+
+    def restore_mempool(self, transactions: list[Transaction]) -> None:
+        """Vuelve a cargar una mempool guardada por el propio servidor."""
+        with self.lock:
+            self.mempool = list(transactions)
+            self._prune()
 
 
 __all__ = ["Node", "RejectedTransaction", "InvalidBlock", "MAX_BLOCK_TXS"]

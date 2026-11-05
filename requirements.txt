@@ -2,3 +2,5 @@
 # Esto es lo que necesita el servidor que conecta la UI con la simulación:
 fastapi>=0.115
 uvicorn[standard]>=0.30
+# Persistencia en PostgreSQL (Supabase). Solo se usa si hay DATABASE_URL.
+psycopg[binary]>=3.2

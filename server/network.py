@@ -8,23 +8,29 @@ representan con exactitud como números).
 from __future__ import annotations
 
 import copy
+import logging
 import threading
 import time
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 
-from minichain.attack import find_nonce_reuse, harvest_signatures, recover_private_keys
+from minichain.attack import (ObservedSignature, Recovery, find_nonce_reuse, harvest_signatures,
+                              recover_from_pair, recover_private_keys)
 from minichain.block import Block, Transaction, meets_difficulty, mine
 from minichain.chain import Blockchain, InvalidBlock
 from minichain.curve import decode_point, secp256k1
 from minichain.merkle import merkle_levels, merkle_proof, verify_merkle_proof
 from minichain.node import Node, RejectedTransaction
-from minichain.nonces import NONCE_KINDS
+from minichain.nonces import NONCE_KINDS, nonce_from_dict, nonce_to_dict
 from minichain.ntheory import modinv
 from minichain.simulation import BLOCK_INTERVAL, build_scenario, make_nonce_fn
-from minichain.validator import ValidationReport, validate_chain
+from minichain.validator import Issue, Ledger, ValidationReport, validate_block, validate_chain
 from minichain.wallet import Wallet
 
+from .storage import FORMAT_VERSION, MemoryStorage, Storage
+
 N = secp256k1.n
+log = logging.getLogger("minichain.network")
 
 
 class NotFound(Exception):
@@ -60,10 +66,108 @@ TAMPER_ACTIONS = {
 
 
 class Network:
-    def __init__(self, params: ScenarioParams | None = None):
+    def __init__(self, params: ScenarioParams | None = None, storage: Storage | None = None):
         self.lock = threading.RLock()
         self.version = 0
-        self.reset(params or ScenarioParams())
+        self.storage: Storage = storage or MemoryStorage()
+        self.storage_error: str | None = None
+        self.restored = False
+        # Si no se pudo LEER el almacenamiento al arrancar, no se escribe nada:
+        # escribir reemplazaría la red guardada por una nueva. Se corrige
+        # reiniciando el servidor cuando la base de datos esté disponible.
+        self._storage_blocked = False
+        # Las cachés tienen su propio candado: un cálculo largo (la primera
+        # validación tras reiniciar) no bloquea transferencias ni minado.
+        self._cache_lock = threading.Lock()
+        self._persisted_blocks = 0      # cuántos bloques ya están en el almacenamiento
+        self._replace_pending = True     # la próxima escritura reemplaza todo
+        self._clear_caches()
+        if not self._restore():
+            self.reset(params or ScenarioParams())
+
+    # ------------------------------------------------------------ persistencia
+
+    def _snapshot_state(self) -> dict:
+        return {
+            "format": FORMAT_VERSION,
+            "version": self.version,
+            "params": asdict(self.params),
+            "difficulty": self.chain.difficulty,
+            "wallets": [{"name": w.name, "private_key": hx(w.private_key),
+                         "nonce": nonce_to_dict(w.nonce_fn)} for w in self.wallets.values()],
+            "mempool": [tx.to_dict() for tx in self.node.mempool],
+        }
+
+    def _persist(self) -> None:
+        """Guarda el estado actual. Se llama con el candado tomado, tras cada cambio.
+
+        Si falla (por ejemplo, la base de datos no responde), la red sigue
+        funcionando en memoria y la próxima escritura reintenta lo pendiente.
+        """
+        if self._storage_blocked:
+            return
+        replace = self._replace_pending
+        start = 0 if replace else self._persisted_blocks
+        blocks = self.chain.blocks
+        try:
+            self.storage.save(self._snapshot_state(), [b.to_dict() for b in blocks[start:]], replace)
+        except Exception as exc:  # noqa: BLE001 - cualquier fallo del almacenamiento
+            self.storage_error = f"{type(exc).__name__}: {exc}"
+            log.error("no se pudo guardar el estado: %s", self.storage_error)
+            return
+        self.storage_error = None
+        self._persisted_blocks = len(blocks)
+        self._replace_pending = False
+
+    def _restore(self) -> bool:
+        """Carga el estado guardado. Devuelve False si no hay nada o no sirve."""
+        try:
+            saved = self.storage.load()
+        except Exception as exc:  # noqa: BLE001
+            self._storage_blocked = True
+            self.storage_error = (f"no se pudo leer el almacenamiento al arrancar ({type(exc).__name__}: {exc}). "
+                                  "La red funciona solo en memoria y no se guarda; reinicia el servidor "
+                                  "cuando la base de datos esté disponible.")
+            log.error(self.storage_error)
+            return False
+        if saved is None:
+            return False
+        state, blocks = saved
+        try:
+            if state.get("format") != FORMAT_VERSION:
+                raise ValueError(f"formato {state.get('format')} no soportado")
+            # Los datos los escribió este mismo servidor después de validarlos:
+            # se revisan enlaces, prueba de trabajo, Merkle y saldos, pero no se
+            # repite la verificación ECDSA (la parte lenta).
+            chain = Blockchain.from_dict({"difficulty": state["difficulty"], "blocks": blocks},
+                                         verify_signatures=False)
+            node = Node(chain)
+            node.restore_mempool([Transaction.from_dict(t) for t in state["mempool"]])
+            wallets = {w["name"]: Wallet(w["name"], int(w["private_key"], 16), nonce_from_dict(w["nonce"]))
+                       for w in state["wallets"]}
+            params = ScenarioParams(**state["params"])
+        except Exception as exc:  # noqa: BLE001
+            log.error("estado guardado inválido, se genera una red nueva: %s", exc)
+            return False
+        with self.lock:
+            self.params, self.node, self.wallets = params, node, wallets
+            self.version = int(state["version"])
+            self._persisted_blocks = len(chain.blocks)
+            self._replace_pending = False
+            self._clear_caches()
+            self.restored = True
+        log.info("red restaurada: %d bloques, %d pendientes, versión %d",
+                 len(chain.blocks), len(node.mempool), self.version)
+        return True
+
+    def storage_info(self) -> dict:
+        return {"kind": self.storage.kind, "ok": self.storage_error is None,
+                "error": self.storage_error, "restored": self.restored}
+
+    def _changed(self) -> None:
+        """Registra un cambio de estado: nueva versión y escritura en el almacenamiento."""
+        self.version += 1
+        self._persist()
 
     # ------------------------------------------------------------ escenario
 
@@ -80,7 +184,10 @@ class Network:
             self.params = params
             self.node = Node(scenario.chain)
             self.wallets: dict[str, Wallet] = dict(scenario.wallets)
-            self.version += 1
+            self._clear_caches()
+            self._replace_pending = True
+            self.restored = False
+            self._changed()
 
     @property
     def chain(self) -> Blockchain:
@@ -115,7 +222,7 @@ class Network:
                 raise BadRequest(f"ya existe una billetera llamada {name!r}")
             wallet = Wallet.generate(name, None, make_nonce_fn(nonce, None, entropy_bits))
             self.wallets[name] = wallet
-            self.version += 1
+            self._changed()
             return self.wallet_json(wallet)
 
     def set_nonce(self, name: str, nonce: str, entropy_bits: int = 3) -> dict:
@@ -124,7 +231,7 @@ class Network:
         with self.lock:
             wallet = self.wallet(name)
             wallet.nonce_fn = make_nonce_fn(nonce, None, entropy_bits)
-            self.version += 1
+            self._changed()
             return self.wallet_json(wallet)
 
     def wallet_json(self, w: Wallet) -> dict:
@@ -161,7 +268,7 @@ class Network:
             self.node.submit(tx)
         except RejectedTransaction as exc:
             raise BadRequest(str(exc)) from None
-        self.version += 1
+        self._changed()
         return self.tx_json(tx)
 
     def mine(self, miner: str, difficulty: int | None, max_difficulty: int) -> dict:
@@ -173,7 +280,7 @@ class Network:
                 block, attempts = self.node.mine(address, difficulty)
             except (ValueError, InvalidBlock) as exc:
                 raise BadRequest(str(exc)) from None
-            self.version += 1
+            self._changed()
             return {"block": self.block_summary(block), "attempts": attempts,
                     "expected_attempts": 2 ** block.difficulty}
 
@@ -327,6 +434,7 @@ class Network:
                 "blocks": [self.block_summary(b) for b in self.chain.blocks],
                 "nonce_kinds": NONCE_KINDS,
                 "clients": clients,
+                "storage": self.storage_info(),
             }
 
     def export_chain(self) -> dict:
@@ -347,11 +455,45 @@ class Network:
                         "ok": b.index not in bad} for b in blocks],
         }
 
+    # ------------------------------------------------------------ cachés
+    #
+    # Verificar una firma en Python puro cuesta decenas de milisegundos (más en
+    # un servidor gratuito con poca CPU). Si cada navegador revalidara la cadena
+    # completa cada vez que algo cambia, unos pocos clientes saturarían el
+    # servidor. Como la cadena solo crece (salvo al regenerar), se valida una
+    # vez cada bloque nuevo y se guarda el resultado; lo mismo con el análisis
+    # de firmas. Todos los clientes reciben la misma respuesta ya calculada.
+
+    def _clear_caches(self) -> None:
+        self._val = {"count": 0, "tip": None, "ledger": Ledger(), "issues": [], "sigs": 0}
+        self._scan = {"count": 0, "tip": None, "observed": [], "recoveries": {}}
+
+    @staticmethod
+    def _cache_prefix_valid(cache: dict, blocks: list[Block]) -> bool:
+        n = cache["count"]
+        return n <= len(blocks) and (n == 0 or blocks[n - 1].hash() == cache["tip"])
+
     def validate(self) -> dict:
+        # Los bloques no cambian una vez agregados y la lista solo crece, así
+        # que basta una copia de la lista para trabajar fuera del candado.
         with self.lock:
             blocks = list(self.chain.blocks)
             difficulty = self.chain.difficulty
-        return self.report_json(validate_chain(blocks, difficulty), blocks)
+        with self._cache_lock:
+            if not self._cache_prefix_valid(self._val, blocks):
+                self._val = {"count": 0, "tip": None, "ledger": Ledger(), "issues": [], "sigs": 0}
+            v = self._val
+            for i in range(v["count"], len(blocks)):
+                prev = blocks[i - 1] if i > 0 else None
+                issues, sigs = validate_block(blocks[i], prev, v["ledger"], difficulty)
+                v["issues"].extend(issues)
+                v["sigs"] += sigs
+            if blocks:
+                v["count"], v["tip"] = len(blocks), blocks[-1].hash()
+            report = ValidationReport(list(v["issues"]), v["ledger"], v["count"], v["sigs"])
+            if not blocks:
+                report.issues.append(Issue(0, None, "génesis", "la cadena está vacía"))
+            return self.report_json(report, blocks)
 
     def validate_external(self, data: dict) -> dict:
         try:
@@ -401,25 +543,49 @@ class Network:
 
     # ------------------------------------------------------------ ataque
 
-    def attack_scan(self) -> dict:
+    def _scan_raw(self) -> tuple[list[ObservedSignature], list, dict[str, Recovery]]:
+        """Firmas, pares con r repetido y claves recuperadas; se recalcula por bloque nuevo."""
         with self.lock:
             blocks = list(self.chain.blocks)
+        with self._cache_lock:
+            if not self._cache_prefix_valid(self._scan, blocks):
+                self._scan = {"count": 0, "tip": None, "observed": [], "recoveries": {}}
+            c = self._scan
+            if c["count"] < len(blocks):
+                c["observed"].extend(harvest_signatures(blocks[c["count"]:]))
+                c["count"], c["tip"] = len(blocks), blocks[-1].hash()
+            pairs = find_nonce_reuse(c["observed"])
+            for a, b in pairs:
+                if a.address in c["recoveries"]:
+                    continue
+                Q = decode_point(secp256k1, bytes.fromhex(a.pubkey_hex))
+                result = recover_from_pair(a.r, a.s, a.z, b.s, b.z, Q, secp256k1)
+                if result is not None:
+                    c["recoveries"][a.address] = Recovery(a, b, *result)
+            return c["observed"], pairs, c["recoveries"]
+
+    def warm_up(self) -> None:
+        """Precalcula validación y análisis (al arrancar, en segundo plano)."""
+        t0 = time.perf_counter()
+        self.validate()
+        self._scan_raw()
+        log.info("cachés listas en %.1f s", time.perf_counter() - t0)
+
+    def attack_scan(self) -> dict:
+        observed, pairs, found = self._scan_raw()
+        with self.lock:
             names = self.names_by_address()
             wallets = dict(self.wallets)
-        observed = harvest_signatures(blocks)
-        pairs = find_nonce_reuse(observed)
         groups: dict[tuple[str, str], set[tuple[int, int]]] = {}
         for a, b in pairs:
             key = (a.address, hx(a.r))
             groups.setdefault(key, set()).update({(a.block, a.tx), (b.block, b.tx)})
 
         recoveries = []
-        for address, rec in recover_private_keys(blocks).items():
+        for address, rec in found.items():
             a, b = rec.first, rec.second
             name = names.get(address)
             wallet = wallets.get(name) if name else None
-            Q = rec.d * secp256k1.G
-            published = decode_point(secp256k1, bytes.fromhex(a.pubkey_hex))
             recoveries.append({
                 "address": address,
                 "name": name,
@@ -433,8 +599,8 @@ class Network:
                 "r_inv": hx(modinv(a.r, N)),
                 "k": hx(rec.k),
                 "d": hx(rec.d),
-                "dG": {"x": hx(Q.x), "y": hx(Q.y)},
-                "dG_matches_pubkey": Q == published,
+                # _scan_raw solo guarda recuperaciones que pasaron d·G == Q.
+                "dG_matches_pubkey": True,
                 # Solo el servidor conoce la clave real; sirve para la demostración.
                 "matches_real_key": wallet is not None and wallet.private_key == rec.d,
             })
@@ -455,7 +621,7 @@ class Network:
         with self.lock:
             victim_address = self.resolve_address(victim)
             thief_address = self.resolve_address(thief)
-            found = recover_private_keys(self.chain.blocks)
+            found = self._scan_raw()[2]
             if victim_address not in found:
                 raise BadRequest("no hay dos firmas de esa billetera con el mismo r: "
                                  "su clave no se puede recuperar")
@@ -476,6 +642,7 @@ class Network:
                 "balances_before": before, "balances_after": after}
 
     @staticmethod
+    @lru_cache(maxsize=32)
     def compare_defense(seed: int, entropy_bits: int) -> dict:
         """Misma simulación con el nonce defectuoso y con RFC 6979."""
         out = {}

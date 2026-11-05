@@ -42,18 +42,19 @@ class Blockchain:
     def next_seq(self, address: str) -> int:
         return self.ledger.next_seq(address)
 
-    def add_block(self, block: Block) -> None:
+    def add_block(self, block: Block, verify_signatures: bool = True) -> None:
         """Valida el bloque contra el estado actual y, si es válido, lo agrega."""
         prev = self.blocks[-1] if self.blocks else None
         trial = self.ledger.copy()
-        issues, _ = validate_block(block, prev, trial, self.difficulty)
+        issues, _ = validate_block(block, prev, trial, self.difficulty, verify_signatures)
         if issues:
             raise InvalidBlock(issues)
         self.blocks.append(block)
         self.ledger = trial
 
     def mine_block(self, transactions: list[Transaction], miner_address: str,
-                   timestamp: int, difficulty: int | None = None) -> tuple[Block, int]:
+                   timestamp: int, difficulty: int | None = None,
+                   verify_signatures: bool = True) -> tuple[Block, int]:
         """Arma un bloque con la recompensa del minero, lo mina y lo agrega.
 
         `difficulty` permite minar un bloque más difícil que el mínimo de la
@@ -64,7 +65,7 @@ class Blockchain:
         block = Block(len(self.blocks), self.tip.hash(), timestamp,
                       self.difficulty if difficulty is None else difficulty, txs)
         attempts = mine(block)
-        self.add_block(block)
+        self.add_block(block, verify_signatures)
         return block, attempts
 
     def validate(self) -> ValidationReport:
@@ -77,11 +78,16 @@ class Blockchain:
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Blockchain":
-        """Reconstruye una cadena validando cada bloque (lanza InvalidBlock)."""
+    def from_dict(cls, data: dict, verify_signatures: bool = True) -> "Blockchain":
+        """Reconstruye una cadena validando cada bloque (lanza InvalidBlock).
+
+        Con `verify_signatures=False` se siguen comprobando enlaces, prueba de
+        trabajo, Merkle, contadores y saldos; solo se omite ECDSA. Sirve para
+        restaurar rápido una cadena que guardó el propio servidor.
+        """
         chain = cls(data["difficulty"])
         for block in data["blocks"]:
-            chain.add_block(Block.from_dict(block))
+            chain.add_block(Block.from_dict(block), verify_signatures)
         return chain
 
     @classmethod

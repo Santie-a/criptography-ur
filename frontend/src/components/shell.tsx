@@ -246,6 +246,15 @@ export function StatusBar() {
           <span className="num">Altura {state.height}</span>
           <span className="num hide-sm">Dificultad {state.difficulty} bits</span>
           <span className="num">Pendientes {state.mempool.length}</span>
+          {state.storage && (
+            <span className="hide-sm" title={state.storage.error ?? `La red se guarda en ${state.storage.kind}`}
+              style={state.storage.ok ? undefined : { color: "var(--bad-text)" }}>
+              <span className={`dot ${state.storage.ok ? (state.storage.kind === "memoria" ? "warn" : "ok") : "bad"}`} />
+              {state.storage.ok
+                ? state.storage.kind === "memoria" ? "Sin persistencia" : `Guardado en ${state.storage.kind}`
+                : "No se está guardando"}
+            </span>
+          )}
           {exposed > 0 && (
             <span style={{ color: "var(--bad-text)" }}>
               <span className="dot bad" />

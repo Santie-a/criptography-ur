@@ -66,6 +66,7 @@ export interface NetworkState {
   blocks: BlockSummary[];
   nonce_kinds: Record<NonceKind, string>;
   clients: number;
+  storage: { kind: string; ok: boolean; error: string | null; restored: boolean };
 }
 
 export interface MerkleProof {
@@ -125,7 +126,6 @@ export interface Recovery {
   r_inv: string;
   k: string;
   d: string;
-  dG: { x: string; y: string };
   dG_matches_pubkey: boolean;
   matches_real_key: boolean;
 }

@@ -41,7 +41,7 @@ y abre http://localhost:5173.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest                 # 48 pruebas: núcleo, comparación con `ecdsa` y API
+python -m pytest                 # 57 pruebas: núcleo, comparación con `ecdsa`, API y persistencia
 cd frontend && npm run typecheck
 ```
 

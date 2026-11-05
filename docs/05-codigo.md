@@ -223,9 +223,10 @@ interfaz y otros clientes. No contiene criptografía propia: todo lo calcula
 | `__main__.py` | `python -m server`: arranca el servidor (opciones `--host`, `--port`, `--reload`). |
 | `config.py` | Lee la configuración de variables de entorno (puerto, semilla, dificultad, CORS…). |
 | `app.py` | Define todas las rutas de la API (`/api/...`) y el WebSocket de eventos. Valida los datos de entrada y sirve la interfaz compilada en `/`. |
-| `network.py` | El estado compartido: un `Node`, las billeteras y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. |
+| `network.py` | El estado compartido: un `Node`, las billeteras y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
 | `labs.py` | Los laboratorios: curva pequeña (puntos, suma, k·P con traza) y ECDSA paso a paso (firmar, verificar, recuperar). No guardan estado. |
 | `events.py` | El canal de eventos en tiempo real: avisa a todos los navegadores cuando algo cambia. |
+| `storage.py` | Dónde se guarda la red: en memoria, en un archivo JSON o en PostgreSQL (Supabase). El servidor guarda tras cada cambio y restaura al arrancar. Ver [Despliegue](DESPLIEGUE.md#persistencia-dónde-se-guarda-la-red). |
 
 La lista de rutas está en [Conectar la UI](CONECTAR_UI.md#endpoints) y, con el
 servidor encendido, en `http://localhost:8000/api/docs`.
@@ -257,7 +258,7 @@ criptografía.
 
 ## 5.5 Las pruebas: `tests/`
 
-Se ejecutan con `python -m pytest`. Son 48.
+Se ejecutan con `python -m pytest`. Son 57 (una de ellas, la de PostgreSQL, solo corre si se define `MINICHAIN_TEST_DATABASE_URL`).
 
 | Archivo | Qué comprueba |
 |---|---|
@@ -266,6 +267,7 @@ Se ejecutan con `python -m pytest`. Son 48.
 | `test_chain.py` | Merkle (raíz calculada a mano y pruebas de inclusión para cada hoja); minado; que una cadena honesta es válida; que se detecta cada tipo de manipulación; que se rechaza gastar de más, repetir transacciones y suplantar firmas; mempool; exportar e importar. |
 | `test_attack.py` | Las fórmulas recuperan k y d; funcionan con firmas low-s; el ataque sobre la cadena simulada recupera exactamente la clave de Bob y el robo pasa la validación; con RFC 6979 no se recupera nada. |
 | `test_server.py` | El flujo completo por la API: estado, bloques, transferir, minar, cliente con clave propia, manipulación sin afectar la red, ataque, defensa, laboratorios, búsqueda y eventos en tiempo real. |
+| `test_storage.py` | Que la red se guarda y se restaura igual (bloques, mempool, billeteras, versión y el generador de Bob), que un estado guardado alterado se rechaza, que una caída de la base de datos no rompe la red ni sobrescribe lo guardado, y que la validación incremental y el análisis cacheado dan lo mismo que el cálculo completo. Incluye una prueba contra PostgreSQL real. |
 
 ---
 

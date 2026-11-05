@@ -109,7 +109,7 @@ proyecto de blockchain se dejó fuera a propósito:
 
 ## Qué se comprobó
 
-- 48 pruebas automáticas (`python -m pytest`) cubren la aritmética de la curva, la
+- 57 pruebas automáticas (`python -m pytest`) cubren la aritmética de la curva, la
   comparación contra la librería `ecdsa`, la cadena, el validador, el ataque, la
   defensa y la API.
 - La firma propia coincide byte a byte con la de la librería `ecdsa` cuando ambas
