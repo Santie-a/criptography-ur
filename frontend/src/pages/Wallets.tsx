@@ -22,21 +22,22 @@ export function Wallets() {
   return (
     <>
       <PageHeader crumbs={[{ label: "Red", href: href("resumen") }, { label: "Billeteras" }]} title="Billeteras"
-        sub="Las billeteras de la simulación las custodia el servidor; cada navegador elige con cuál firma."
+        sub="Las de la simulación las custodia el servidor; las de los participantes viven en su dispositivo."
         actions={isAdmin && <Button variant="primary" icon={<Plus size={14} />} onClick={() => openDialog("wallet")}>Nueva billetera</Button>} />
       <div className="list-detail">
         <div className="list">
           <Panel flush>
             <div className="table-wrap">
               <table className="table">
-                <thead><tr><th>Nombre</th><th>Dirección</th><th className="right">Saldo</th><th className="right">Disponible</th><th className="right">Seq</th><th>Nonce</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Nombre</th><th>Clave en</th><th>Dirección</th><th className="right">Saldo</th><th className="right">Disponible</th><th className="right">Seq</th><th>Nonce</th><th>Estado</th></tr></thead>
                 <tbody>
-                  {state.wallets.map((w) => (
+                  {[...state.wallets, ...state.participants].map((w) => (
                     <tr key={w.name} className={`clickable ${w.name === selected ? "selected" : ""}`} onClick={() => go("billeteras", { w: w.name })}>
                       <td>
                         <span className="row-nowrap"><span className="avatar" style={{ width: 20, height: 20, fontSize: 9 }}>{initials(w.name)}</span><strong>{w.name}</strong>
                           {isAdmin && w.name === identity && <Tag tone="accent">tú</Tag>}</span>
                       </td>
+                      <td>{w.custody === "dispositivo" ? <Tag tone="accent">dispositivo</Tag> : <Tag>servidor</Tag>}</td>
                       <td><Hex value={w.address} n={6} /></td>
                       <td className="right num">{w.balance}</td>
                       <td className="right num">{w.available}</td>
@@ -52,7 +53,7 @@ export function Wallets() {
         </div>
 
         {detail && (
-          <Inspector title={detail.name} actions={isAdmin && detail.name !== identity && (
+          <Inspector title={detail.name} actions={isAdmin && detail.custody === "servidor" && detail.name !== identity && (
             <Button size="sm" icon={<UserCheck size={12} />} onClick={() => { setIdentity(detail.name); notify(`Ahora firmas como ${detail.name}`); }}>Usar</Button>
           )}>
             {exposed.has(detail.address) && (
@@ -72,11 +73,13 @@ export function Wallets() {
               <dl className="kv">
                 <dt>Dirección</dt><dd><Hex value={detail.address} n={14} /></dd>
                 <dt>Clave pública</dt><dd><Hex value={detail.pubkey} full /></dd>
-                <dt>Clave privada</dt><dd className="muted small">Solo la conoce el servidor.</dd>
+                <dt>Clave privada</dt><dd className="muted small">{detail.custody === "dispositivo"
+                  ? "Solo existe en el dispositivo de su dueño: el servidor nunca la vio."
+                  : "Billetera de la simulación: la custodia el servidor."}</dd>
               </dl>
             </Section>
             <Section title="Generación del nonce k">
-              {isAdmin ? (
+              {isAdmin && detail.custody === "servidor" ? (
                 <>
                   <select className="select" value={detail.nonce} onChange={async (e) => {
                     const w = await run(() => api.setNonce(detail.name, e.target.value as NonceKind));

@@ -6,6 +6,7 @@ import { Blocks } from "./pages/Blocks";
 import { CurveLab } from "./pages/CurveLab";
 import { Dashboard } from "./pages/Dashboard";
 import { Integrity } from "./pages/Integrity";
+import { MyWallet } from "./pages/MyWallet";
 import { Scenario } from "./pages/Scenario";
 import { SignatureAnalysis } from "./pages/SignatureAnalysis";
 import { SignLab } from "./pages/SignLab";
@@ -16,6 +17,7 @@ import { useStore } from "./store";
 
 const PAGES: Record<string, ComponentType> = {
   resumen: Dashboard,
+  billetera: MyWallet,
   bloques: Blocks,
   transacciones: Transactions,
   billeteras: Wallets,

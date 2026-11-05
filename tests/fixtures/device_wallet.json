@@ -1,0 +1,83 @@
+{
+  "private_key": "6f1d3e0a5c2b9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706",
+  "pubkey": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+  "address": "mc4b9edf6405d3e69d6c1905e20d3416b44b207cd7",
+  "cases": [
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 10,
+      "seq": 0,
+      "memo": "",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "6aada7caea18f939182d3a1cf6bd593ecaf56c91dad3b7d42baf54061f6771fc3b239260a280e0566e7f5aad31a6073751e7d4b97515fb585d1aac3ea85e0ac5",
+      "payload": "{\"amount\":10,\"memo\":\"\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":0}",
+      "z": "7df6ff670b16d3b41c94925f76b1ce5ddbf800ac006a25c3a5ffac522e85236d"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 11,
+      "seq": 1,
+      "memo": "café",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "115cc324d5aacd4a3a4d2606141050c966f41374c5cf4dc93e5dbbb9508ba19d3fc253adf94f0b0c5a4bf2fe36834375649c2b589da063ee03b8856f57caf91d",
+      "payload": "{\"amount\":11,\"memo\":\"caf\\u00e9\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":1}",
+      "z": "16d1f86de9d4b08d6cb2adcf3e3e0b84b5f43be5b886187b5ca4602620cddea6"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 12,
+      "seq": 2,
+      "memo": "niño 😀",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "c9366c043e2eb7298e17def09556a81601bea21ca21ed34caf0b897a3d5e125a12a0ed7c62a63ef31c62e9c172bb2365ab227ecb7f9a05ba7f7839775426ac3c",
+      "payload": "{\"amount\":12,\"memo\":\"ni\\u00f1o \\ud83d\\ude00\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":2}",
+      "z": "47c7bd7540b79a439561e87ecd96d9dd0d06645d1c6acdc5510ac77c5607c8b0"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 13,
+      "seq": 3,
+      "memo": "comillas \"y\" \\barra",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "24e2579a979df449c0a52499d936c2871264a21e4d71639ba67f69629d7851d674e33cf8486e9de15aaecb013142d81759b7ec4a386d9648fa79e39c7062a5d6",
+      "payload": "{\"amount\":13,\"memo\":\"comillas \\\"y\\\" \\\\barra\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":3}",
+      "z": "f2969696217656e96794f05c9ea00571baed0a15636ef1aef1b419e2e1871a07"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 14,
+      "seq": 4,
+      "memo": "línea\nnueva\ttab",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "1e608039381884502f9dec572936f0b75412ed5371d765c4a9e78f8adab8c2f459ee48d797d453ad7b5dd7783fdd608f0c63eaae5a5c3f37544a17d54ea0c527",
+      "payload": "{\"amount\":14,\"memo\":\"l\\u00ednea\\nnueva\\ttab\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":4}",
+      "z": "2136bc36d4699b5e3b0dea75c9ab64002354aecd78103df1c6c6a2ac162cf216"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 15,
+      "seq": 5,
+      "memo": "\u0001control",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "8b81ea483e344ee575b0213ef6a33ff5867a44a9c8dba69587ea1315fd7aa7e94f177430c71922e31cdeb1b498edc3b1c7f72f523d9c3a617fae59c53de93556",
+      "payload": "{\"amount\":15,\"memo\":\"\\u0001control\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":5}",
+      "z": "f0f1e9248e7bdd1f309af63e5f1ed0efba808d8361a395897b9a9cd0e44ae516"
+    },
+    {
+      "recipient": "mcabababababababababababababababababababab",
+      "amount": 16,
+      "seq": 6,
+      "memo": "ñandú/€",
+      "sender": "037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+      "signature": "8c8440b6f918a22a1ad172b90ef603156d094a39462ada1b97d22b639c93163634ae4f05264dd889dc2325e79e733901265c4650852e92488f23b406501436f8",
+      "payload": "{\"amount\":16,\"memo\":\"\\u00f1and\\u00fa/\\u20ac\",\"recipient\":\"mcabababababababababababababababababababab\",\"sender\":\"037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523\",\"seq\":6}",
+      "z": "f9b343fb483f6260ae5df1d0a60cd26c5b201601e9b7ca1762172afc30add21f"
+    }
+  ],
+  "registration": {
+    "name": "Sofía",
+    "message": "minichain:registro:Sofía:037af7134583a73c06e8be9b31377ff15605a9a23df65d7c2877358b5ce8ce0523",
+    "signature": "0fb9a56250ce8d24f48fddf24b4e95b7137cddd8d2f9a759f23c1948b286e74478f4ba0121e7a348de553ec4a73e111bba519af0de9b2828ba907840c0f61ddb",
+    "z": "d354263b79834d7f4bacf1bfa78e38be1cd22f146e7bd894cbde8782f66d485c"
+  }
+}

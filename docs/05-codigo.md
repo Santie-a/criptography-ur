@@ -223,7 +223,7 @@ interfaz y otros clientes. No contiene criptografía propia: todo lo calcula
 | `__main__.py` | `python -m server`: arranca el servidor (opciones `--host`, `--port`, `--reload`). |
 | `config.py` | Lee la configuración de variables de entorno (puerto, semilla, dificultad, CORS…). |
 | `app.py` | Define todas las rutas de la API (`/api/...`) y el WebSocket de eventos. Valida los datos de entrada y sirve la interfaz compilada en `/`. |
-| `network.py` | El estado compartido: un `Node`, las billeteras y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
+| `network.py` | El estado compartido: un `Node`, las billeteras custodiadas, los **participantes** (billeteras de dispositivos: solo nombre y clave pública, registrados con una firma) y el escenario. Traduce los objetos del núcleo a JSON (los números de 256 bits van como texto hexadecimal). Contiene la búsqueda, las manipulaciones de prueba, el ataque y la comparación de estrategias. Guarda la validación y el análisis de firmas en caché: cada bloque nuevo se valida una sola vez y todos los clientes reciben el mismo resultado. |
 | `labs.py` | Los laboratorios: curva pequeña (puntos, suma, k·P con traza) y ECDSA paso a paso (firmar, verificar, recuperar). No guardan estado. |
 | `events.py` | El canal de eventos en tiempo real: avisa a todos los navegadores cuando algo cambia. |
 | `security.py` | Los roles: comprueba el token de administrador (`MINICHAIN_ADMIN_TOKEN`) en las rutas que controlan la simulación, y limita las escrituras públicas por IP. Ver [Roles](CONECTAR_UI.md#roles). |
@@ -252,6 +252,8 @@ criptografía.
 | `src/components/admin.tsx` | El aviso "Requiere administrador" que reemplaza las acciones restringidas. |
 | `src/components/ui.tsx` | Componentes base: paneles, tablas, pestañas, botones, etiquetas, avisos… |
 | `src/components/chain.tsx` | Visualizaciones: la tira de bloques enlazados y el árbol de Merkle. |
+| `src/wallet/crypto.ts` | La criptografía de la billetera del dispositivo: generar la clave, derivar clave pública y dirección, serializar la transacción **exactamente igual que Python** (JSON canónico con los caracteres no ASCII escapados) y firmar con [@noble/secp256k1](https://github.com/paulmillr/noble-secp256k1) (ECDSA con RFC 6979). |
+| `src/wallet/device.ts` | Guarda la billetera en el navegador (`localStorage`) y la sincroniza entre pestañas. La clave privada no sale de aquí. |
 | `src/pages/*.tsx` | Una página por sección. Se describen en [6. La interfaz](06-interfaz.md). |
 | `src/styles/tokens.css` | Colores, tipografía y medidas (ver [Sistema de diseño](DISENO.md)). |
 | `src/styles/app.css` | Estilos de todos los componentes. |
@@ -260,7 +262,7 @@ criptografía.
 
 ## 5.5 Las pruebas: `tests/`
 
-Se ejecutan con `python -m pytest`. Son 71 (una de ellas, la de PostgreSQL, solo corre si se define `MINICHAIN_TEST_DATABASE_URL`).
+Se ejecutan con `python -m pytest`. Son 80 (una de ellas, la de PostgreSQL, solo corre si se define `MINICHAIN_TEST_DATABASE_URL`). Además, `cd frontend && npm test` ejecuta 5 pruebas de la criptografía del navegador con la misma fixture.
 
 | Archivo | Qué comprueba |
 |---|---|
@@ -270,6 +272,8 @@ Se ejecutan con `python -m pytest`. Son 71 (una de ellas, la de PostgreSQL, solo
 | `test_attack.py` | Las fórmulas recuperan k y d; funcionan con firmas low-s; el ataque sobre la cadena simulada recupera exactamente la clave de Bob y el robo pasa la validación; con RFC 6979 no se recupera nada. |
 | `test_server.py` | El flujo completo por la API: estado, bloques, transferir, minar, cliente con clave propia, manipulación sin afectar la red, ataque, defensa, laboratorios, búsqueda y eventos en tiempo real. |
 | `test_auth.py` | Que cada ruta de administrador rechaza peticiones sin token o con un token incorrecto y las acepta con el correcto; que el público puede leer todo y enviar transacciones firmadas con su propia clave, pero no gastar dinero ajeno; el límite de peticiones; y el modo abierto. |
+| `test_device_wallet.py` | Que las firmas hechas en el navegador (fixture generada con `frontend/tests/make-fixture.ts`) verifican con la implementación propia y que el texto firmado es idéntico byte a byte, con acentos, emojis, comillas y saltos de línea. |
+| `test_participants.py` | Registro firmado de participantes (rechaza firmas de otra clave o de otro nombre), nombres únicos, una billetera de dispositivo que recibe y envía de punta a punta, y que los registros sobreviven a reinicios y a regenerar la red. |
 | `test_storage.py` | Que la red se guarda y se restaura igual (bloques, mempool, billeteras, versión y el generador de Bob), que un estado guardado alterado se rechaza, que una caída de la base de datos no rompe la red ni sobrescribe lo guardado, y que la validación incremental y el análisis cacheado dan lo mismo que el cálculo completo. Incluye una prueba contra PostgreSQL real. |
 
 ---

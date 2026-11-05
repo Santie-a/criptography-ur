@@ -25,7 +25,8 @@ from minichain.nonces import NONCE_KINDS, nonce_from_dict, nonce_to_dict
 from minichain.ntheory import modinv
 from minichain.simulation import BLOCK_INTERVAL, build_scenario, make_nonce_fn
 from minichain.validator import Issue, Ledger, ValidationReport, validate_block, validate_chain
-from minichain.wallet import Wallet
+from minichain.signatures import Signature, verify
+from minichain.wallet import Wallet, address_from_pubkey
 
 from .storage import FORMAT_VERSION, MemoryStorage, Storage
 
@@ -81,6 +82,10 @@ class Network:
         self._cache_lock = threading.Lock()
         self._persisted_blocks = 0      # cuántos bloques ya están en el almacenamiento
         self._replace_pending = True     # la próxima escritura reemplaza todo
+        # Participantes: billeteras que viven en un dispositivo (celular o PC).
+        # El servidor solo conoce su nombre y su clave pública, nunca la privada.
+        # dirección -> {"name", "pubkey", "joined"}
+        self.participants: dict[str, dict] = {}
         self._clear_caches()
         if not self._restore():
             self.reset(params or ScenarioParams())
@@ -96,6 +101,7 @@ class Network:
             "wallets": [{"name": w.name, "private_key": hx(w.private_key),
                          "nonce": nonce_to_dict(w.nonce_fn)} for w in self.wallets.values()],
             "mempool": [tx.to_dict() for tx in self.node.mempool],
+            "participants": [{"address": a, **p} for a, p in self.participants.items()],
         }
 
     def _persist(self) -> None:
@@ -146,11 +152,14 @@ class Network:
             wallets = {w["name"]: Wallet(w["name"], int(w["private_key"], 16), nonce_from_dict(w["nonce"]))
                        for w in state["wallets"]}
             params = ScenarioParams(**state["params"])
+            participants = {p["address"]: {"name": p["name"], "pubkey": p["pubkey"], "joined": p["joined"]}
+                            for p in state.get("participants", [])}
         except Exception as exc:  # noqa: BLE001
             log.error("estado guardado inválido, se genera una red nueva: %s", exc)
             return False
         with self.lock:
             self.params, self.node, self.wallets = params, node, wallets
+            self.participants = participants
             self.version = int(state["version"])
             self._persisted_blocks = len(chain.blocks)
             self._replace_pending = False
@@ -204,12 +213,95 @@ class Network:
     def resolve_address(self, name_or_address: str) -> str:
         if name_or_address in self.wallets:
             return self.wallets[name_or_address].address
+        for address, p in self.participants.items():
+            if p["name"] == name_or_address:
+                return address
         if name_or_address.startswith("mc") and len(name_or_address) == 42:
             return name_or_address
         raise NotFound(f"destinatario desconocido: {name_or_address!r}")
 
     def names_by_address(self) -> dict[str, str]:
-        return {w.address: name for name, w in self.wallets.items()}
+        names = {a: p["name"] for a, p in self.participants.items()}
+        names.update({w.address: name for name, w in self.wallets.items()})
+        return names
+
+    def _name_taken(self, name: str, except_address: str | None = None) -> bool:
+        low = name.lower()
+        if any(n.lower() == low for n in self.wallets):
+            return True
+        return any(p["name"].lower() == low and a != except_address for a, p in self.participants.items())
+
+    # ------------------------------------------------------------ participantes
+
+    MAX_PARTICIPANTS = 500
+
+    @staticmethod
+    def registration_message(name: str, pubkey_hex: str) -> bytes:
+        """Lo que firma el dispositivo para registrar su nombre (ver frontend/src/wallet/crypto.ts)."""
+        return f"minichain:registro:{name}:{pubkey_hex}".encode()
+
+    def register_participant(self, name: str, pubkey_hex: str, signature_hex: str) -> dict:
+        """Asocia un nombre a una clave pública. La firma prueba que lo pide el dueño de la clave.
+
+        Volver a registrarse con la misma clave es válido (por ejemplo, tras
+        regenerar la red o si el servidor perdió el registro): actualiza el nombre.
+        """
+        name = name.strip()
+        if not 1 <= len(name) <= 24 or any(ord(c) < 32 for c in name):
+            raise BadRequest("el nombre debe tener entre 1 y 24 caracteres visibles")
+        pubkey_hex = pubkey_hex.strip().lower()
+        try:
+            Q = decode_point(secp256k1, bytes.fromhex(pubkey_hex))
+            sig = Signature.from_hex(signature_hex)
+        except ValueError as exc:
+            raise BadRequest(f"clave pública o firma inválida: {exc}") from None
+        if len(pubkey_hex) != 66:
+            raise BadRequest("la clave pública debe ir comprimida (33 bytes)")
+        if not verify(Q, self.registration_message(name, pubkey_hex), sig):
+            raise BadRequest("la firma del registro no corresponde a esa clave pública")
+        address = address_from_pubkey(bytes.fromhex(pubkey_hex))
+        with self.lock:
+            if self._name_taken(name, except_address=address):
+                raise BadRequest(f"el nombre {name!r} ya está en uso")
+            known = self.participants.get(address)
+            if known is None and len(self.participants) >= self.MAX_PARTICIPANTS:
+                raise BadRequest("la red alcanzó el máximo de participantes")
+            if known is None or known["name"] != name:
+                self.participants[address] = {"name": name, "pubkey": pubkey_hex,
+                                              "joined": (known or {}).get("joined", int(time.time()))}
+                self._changed()
+            return self.participant_json(address)
+
+    def participant_json(self, address: str) -> dict:
+        p = self.participants[address]
+        return {
+            "name": p["name"],
+            "address": address,
+            "pubkey": p["pubkey"],
+            "balance": self.chain.balance(address),
+            "available": self.node.available_balance(address),
+            "next_seq": self.node.next_seq(address),
+            "nonce": "rfc6979",
+            "nonce_label": "RFC 6979, en el dispositivo",
+            "custody": "dispositivo",
+            "joined": p["joined"],
+        }
+
+    def account(self, address: str) -> dict:
+        """Saldo y siguiente seq de cualquier dirección (lo que necesita un dispositivo para firmar)."""
+        address = address.strip()
+        if not (address.startswith("mc") and len(address) == 42):
+            raise BadRequest("dirección inválida")
+        with self.lock:
+            if address in self.participants:
+                return self.participant_json(address)
+            for w in self.wallets.values():
+                if w.address == address:
+                    return self.wallet_json(w)
+            return {"name": None, "address": address, "pubkey": None, "custody": None,
+                    "balance": self.chain.balance(address),
+                    "available": self.node.available_balance(address),
+                    "next_seq": self.node.next_seq(address)}
 
     def create_wallet(self, name: str, nonce: str, entropy_bits: int = 3) -> dict:
         name = name.strip()
@@ -218,7 +310,7 @@ class Network:
         if nonce not in NONCE_KINDS:
             raise BadRequest(f"estrategia desconocida: {nonce}")
         with self.lock:
-            if name in self.wallets:
+            if self._name_taken(name):
                 raise BadRequest(f"ya existe una billetera llamada {name!r}")
             wallet = Wallet.generate(name, None, make_nonce_fn(nonce, None, entropy_bits))
             self.wallets[name] = wallet
@@ -244,6 +336,7 @@ class Network:
             "next_seq": self.node.next_seq(w.address),
             "nonce": w.nonce_kind,
             "nonce_label": NONCE_KINDS.get(w.nonce_kind, w.nonce_kind),
+            "custody": "servidor",
         }
 
     # ------------------------------------------------------------ transacciones
@@ -384,11 +477,17 @@ class Network:
         raise NotFound("no existe esa transacción")
 
     def wallet_detail(self, name: str) -> dict:
+        """Billetera custodiada o participante, por nombre, con su historial."""
         with self.lock:
-            w = self.wallet(name)
-            data = self.wallet_json(w)
-            data["history"] = self.transactions(w.address, limit=100)
-            data["signatures"] = sum(1 for t in data["history"] if t["sender_address"] == w.address)
+            if name in self.wallets:
+                data = self.wallet_json(self.wallets[name])
+            else:
+                address = next((a for a, p in self.participants.items() if p["name"] == name), None)
+                if address is None:
+                    raise NotFound(f"no existe la billetera {name!r}")
+                data = self.participant_json(address)
+            data["history"] = self.transactions(data["address"], limit=100)
+            data["signatures"] = sum(1 for t in data["history"] if t["sender_address"] == data["address"])
             return data
 
     def search(self, query: str) -> list[dict]:
@@ -406,6 +505,10 @@ class Network:
             for name, w in self.wallets.items():
                 if q in name.lower() or (len(q) >= 4 and w.address.startswith(q)):
                     results.append({"type": "wallet", "ref": name, "label": name, "detail": w.address})
+            for address, p in self.participants.items():
+                if q in p["name"].lower() or (len(q) >= 4 and address.startswith(q)):
+                    results.append({"type": "wallet", "ref": p["name"], "label": f"{p['name']} (dispositivo)",
+                                    "detail": address})
             if len(q) >= 4 and all(c in "0123456789abcdef" for c in q):
                 for b in blocks:
                     if b.hash().startswith(q):
@@ -430,6 +533,7 @@ class Network:
                 "height": len(self.chain.blocks) - 1,
                 "tip": self.chain.tip.hash(),
                 "wallets": [self.wallet_json(w) for w in self.wallets.values()],
+                "participants": [self.participant_json(a) for a in self.participants],
                 "mempool": [self.tx_json(tx) for tx in self.node.mempool],
                 "blocks": [self.block_summary(b) for b in self.chain.blocks],
                 "nonce_kinds": NONCE_KINDS,

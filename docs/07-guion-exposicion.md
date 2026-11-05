@@ -25,6 +25,18 @@ dice **qué abrir**, **qué hacer** y **qué decir**.
 
 ---
 
+## 0. Opcional: que el público se una (3 min) · Tú → Mi billetera
+
+**Hacer:** compartir la URL. Cada persona abre **Mi billetera** en su celular,
+escribe su nombre y pulsa **Crear billetera**. Desde el PC (administrador), enviarle
+monedas a algunos con **Transferir** y **Minar**. Pedirles que se envíen entre ellos.
+
+**Decir:** "La clave privada de cada uno se acaba de generar en su celular y no salió
+de ahí. Para enviar no necesitan contraseña: la firma es la prueba de que son
+ustedes. Ni yo, que administro el servidor, puedo gastar su dinero."
+
+---
+
 ## 1. El síntoma (1 min) · Red → Resumen
 
 **Hacer:** mostrar la pantalla de inicio.

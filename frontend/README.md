@@ -8,11 +8,13 @@ npm install
 npm run dev        # http://localhost:5173, reenvía /api a http://127.0.0.1:8000
 npm run build      # genera dist/, que `python -m server` sirve en http://localhost:8000
 npm run typecheck
+npm test           # criptografía de la billetera del navegador (node --test)
 ```
 
 | Archivo | Qué hay |
 |---|---|
 | `src/api.ts` | Único punto de contacto con la API |
+| `src/wallet/` | Billetera del dispositivo: claves, firma (RFC 6979) y almacenamiento local |
 | `src/types.ts` | Tipos de las respuestas |
 | `src/store.tsx` | Estado de la red, WebSocket con reconexión, identidad activa, alertas y diálogos |
 | `src/router.ts` | Rutas por hash con parámetros (`#/bloques?b=3`) |

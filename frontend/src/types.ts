@@ -12,6 +12,23 @@ export interface Wallet {
   next_seq: number;
   nonce: NonceKind | "custom";
   nonce_label: string;
+  /** servidor: billetera de la simulación; dispositivo: la clave vive en un celular o PC. */
+  custody: "servidor" | "dispositivo";
+}
+
+export interface Participant extends Wallet {
+  custody: "dispositivo";
+  joined: number;
+}
+
+export interface Account {
+  name: string | null;
+  address: string;
+  pubkey: string | null;
+  custody: "servidor" | "dispositivo" | null;
+  balance: number;
+  available: number;
+  next_seq: number;
 }
 
 export interface Tx {
@@ -62,6 +79,7 @@ export interface NetworkState {
   height: number;
   tip: string;
   wallets: Wallet[];
+  participants: Participant[];
   mempool: Tx[];
   blocks: BlockSummary[];
   nonce_kinds: Record<NonceKind, string>;

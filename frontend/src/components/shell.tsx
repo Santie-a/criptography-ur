@@ -4,7 +4,7 @@
 //   barra de estado: visibilidad del estado del sistema (heurística 1 de Nielsen)
 import {
   Blocks, Boxes, Coins, FileSignature, Hammer, LayoutDashboard, Menu, Moon, ScanSearch, Search,
-  Lock, Send, Settings2, ShieldCheck, Spline, Sun, Wallet,
+  Lock, Send, Settings2, ShieldCheck, Smartphone, Spline, Sun, Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { api } from "../api";
@@ -12,6 +12,7 @@ import { go, href } from "../router";
 import { useStore } from "../store";
 import type { SearchResult } from "../types";
 import { initials } from "./ui";
+import { useDeviceWallet } from "../wallet/device";
 
 interface NavItem {
   id: string;
@@ -20,6 +21,10 @@ interface NavItem {
 }
 
 export const NAV: { title: string; items: NavItem[] }[] = [
+  {
+    title: "Tú",
+    items: [{ id: "billetera", label: "Mi billetera", icon: Smartphone }],
+  },
   {
     title: "Red",
     items: [
@@ -68,6 +73,7 @@ function useTheme(): [boolean, () => void] {
 export function Header({ onToggleNav }: { onToggleNav: () => void }) {
   const { state, identity, setIdentity, openDialog, isAdmin, authRequired } = useStore();
   const [dark, toggleTheme] = useTheme();
+  const [device] = useDeviceWallet();
 
   return (
     <header className="header">
@@ -99,6 +105,15 @@ export function Header({ onToggleNav }: { onToggleNav: () => void }) {
                 {state?.wallets.map((w) => <option key={w.name} value={w.name}>{w.name}</option>)}
               </select>
             </label>
+            <span className="header-sep hide-sm" />
+          </>
+        )}
+        {!isAdmin && (
+          <>
+            <a className="identity device" href={href("billetera")} title={device ? "Mi billetera" : "Crear mi billetera"}>
+              <span className="avatar">{device ? initials(device.name) : <Smartphone size={13} />}</span>
+              <span className="label-text">{device ? device.name : "Crear billetera"}</span>
+            </a>
             <span className="header-sep hide-sm" />
           </>
         )}

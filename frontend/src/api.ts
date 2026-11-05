@@ -4,7 +4,7 @@ import type {
   AttackScan, BlockDetail, CurveAdd, CurveMul, CurvePoints, DefenseStats, MerkleProof,
   MineResult, NetworkState, NonceKind, Pt, RecoverResult, ScenarioParams, SearchResult, Secp256k1Info,
   SignResult, StealResult, TamperResult, Tx, TxDetail, TxRow, ValidationResult, VerifySteps, Wallet,
-  WalletDetail,
+  WalletDetail, Account, Participant,
 } from "./types";
 
 const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
@@ -82,6 +82,12 @@ export const api = {
     get<TxRow[]>(`/api/transactions${address ? `?address=${encodeURIComponent(address)}` : ""}`),
   transaction: (txid: string) => get<TxDetail>(`/api/transactions/${txid}`),
   wallet: (name: string) => get<WalletDetail>(`/api/wallets/${encodeURIComponent(name)}`),
+  // billetera del dispositivo (la firma se hace en el navegador)
+  account: (address: string) => get<Account>(`/api/accounts/${address}`),
+  registerParticipant: (name: string, pubkey: string, signature: string) =>
+    post<Participant>("/api/participants", { name, pubkey, signature }),
+  submitTransaction: (tx: { sender: string; recipient: string; amount: number; seq: number; memo: string; signature: string }) =>
+    post<Tx>("/api/transactions", tx),
   // billeteras y transacciones
   createWallet: (name: string, nonce: NonceKind) => post<Wallet>("/api/wallets", { name, nonce }),
   setNonce: (name: string, nonce: NonceKind) =>

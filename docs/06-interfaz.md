@@ -56,6 +56,7 @@ Agrupada por **para qué** sirve cada sección, no por un orden de pasos:
 
 | Grupo | Propósito |
 |---|---|
+| **Tú** | Tu billetera en este dispositivo: crearla, recibir y enviar. |
 | **Red** | Ver lo que hay: bloques, transacciones y billeteras. Es la parte de "explorador de bloques". |
 | **Seguridad** | Auditar lo que hay: si la cadena fue manipulada y si alguna firma expone una clave. |
 | **Laboratorio** | Entender las piezas matemáticas por separado, con números pequeños o con todos los valores intermedios a la vista. |
@@ -98,6 +99,7 @@ La aplicación tiene dos roles (detalle técnico en [Roles](CONECTAR_UI.md#roles
 | Explorar bloques, transacciones y billeteras | Sí | Sí |
 | Ver la integridad de la cadena y el análisis de firmas, incluida la clave recuperada | Sí | Sí |
 | Usar los laboratorios | Sí (con límite de uso) | Sí |
+| Crear su billetera en el dispositivo y enviar desde ella | Sí | Sí |
 | Transferir, minar, crear billeteras de la simulación y cambiar su nonce | No | Sí |
 | Simular manipulaciones, validar archivos y comparar estrategias | No | Sí |
 | Explotar una clave expuesta y regenerar la red | No | Sí |
@@ -112,12 +114,58 @@ guardado en ese navegador hasta que cierre la sesión.
 
 ### Varias personas a la vez
 
-Todos los navegadores conectados comparten **la misma red**. Si el administrador
-transfiere o mina, los demás lo ven al instante (la página se actualiza sola).
+Todos los navegadores conectados comparten **la misma red**. Si alguien envía o el
+administrador mina, los demás lo ven al instante (la página se actualiza sola). En
+clase, cada estudiante crea su billetera en el celular, el administrador le envía
+monedas y desde ahí pueden enviarse entre ellos.
 
 ---
 
-## 6.2 Red · Resumen
+## 6.2 Tú · Mi billetera
+
+**Propósito:** que cada persona tenga su propia billetera, en su celular o PC, y la
+use como una billetera real: **la clave privada se genera y se guarda solo en ese
+dispositivo**. El servidor nunca la recibe.
+
+### Si todavía no hay billetera
+
+| Zona | Qué hace |
+|---|---|
+| **Crear tu billetera** | Pide un nombre, genera un par de claves en el navegador y registra el nombre en la red. El registro va **firmado con la nueva clave**, así nadie puede registrar una clave pública ajena con otro nombre. |
+| **Restaurar una billetera** | Para recuperar una billetera exportada antes: se pega la clave privada (64 dígitos hexadecimales) y el nombre. |
+
+### Con billetera
+
+| Zona | Qué muestra o hace |
+|---|---|
+| **Saldo** | Lo disponible (descontando lo que está pendiente) y lo confirmado. Se actualiza solo cuando alguien te envía o se mina un bloque. |
+| **Enviar** | Destinatario (otro participante, una billetera de la simulación o una dirección), monto y memo. **Firmar en este dispositivo y enviar** arma la transacción, la firma aquí y la manda a la red. Debajo, "Qué firmó este dispositivo" muestra el mensaje exacto, su hash z y la firma (r, s). |
+| **Recibir** | Tu dirección, con un botón para copiarla. |
+| **Movimientos** | Lo que enviaste y recibiste, incluido lo pendiente. |
+| **Seguridad** | La clave pública, **Exportar clave privada** (para respaldarla) y **Olvidar billetera en este dispositivo**. |
+
+En el encabezado, a la derecha, aparece tu nombre (o "Crear billetera" si aún no
+tienes); lleva a esta página.
+
+### Lo que conviene saber
+
+- **La firma es la autorización.** Para enviar no hace falta cuenta ni contraseña:
+  el servidor solo comprueba que la firma corresponde a la clave pública del emisor.
+  Sin tu clave privada, nadie puede gastar tus monedas, ni siquiera el servidor.
+- **Nonces seguros.** La billetera del dispositivo firma con RFC 6979: no puede
+  repetir nonces, así que no es vulnerable al ataque del [documento 4](04-vulnerabilidad.md).
+- **Si borras los datos del navegador, pierdes la billetera**, igual que si pierdes
+  una billetera real. Por eso existe *Exportar clave privada*.
+- Si el administrador regenera la red, tu billetera sigue registrada con su nombre,
+  pero el saldo vuelve a 0 porque la cadena es nueva.
+
+**Qué concepto ilustra:** la diferencia entre clave privada (secreta, en tu
+dispositivo) y clave pública (la conoce todo el mundo), y que en una blockchain la
+identidad **es** la clave ([2.2](02-blockchain.md#22-las-cuentas-y-las-direcciones)).
+
+---
+
+## 6.3 Red · Resumen
 
 **Propósito:** ver el estado de la red de un vistazo y enterarse de cualquier
 problema de seguridad. Es la página de inicio.
@@ -136,7 +184,7 @@ públicos. Nadie "hackeó" nada: el sistema simplemente analizó las firmas.
 
 ---
 
-## 6.3 Red · Bloques
+## 6.4 Red · Bloques
 
 **Propósito:** inspeccionar la cadena bloque por bloque y ver cómo se enlazan.
 
@@ -154,7 +202,7 @@ Merkle ([2.6](02-blockchain.md#26-el-árbol-de-merkle)).
 
 ---
 
-## 6.4 Red · Transacciones
+## 6.5 Red · Transacciones
 
 **Propósito:** ver cada transacción con su firma y lo que se firmó.
 
@@ -171,15 +219,15 @@ mensaje para calcular z) está a la vista de cualquiera
 
 ---
 
-## 6.5 Red · Billeteras
+## 6.6 Red · Billeteras
 
 **Propósito:** ver y gestionar las cuentas.
 
 | Zona | Qué muestra |
 |---|---|
-| **Botón Nueva billetera** | Crea una billetera propia (útil cuando hay varias personas conectadas). |
-| **Tabla** | Nombre (con la etiqueta "tú" en la que estás usando), dirección, saldo confirmado, saldo disponible (descontando lo pendiente), próximo seq, estrategia de nonce y estado ("clave expuesta" si aplica). |
-| **Inspector** | Saldo, cuántas firmas publicó, dirección y clave pública (la privada nunca se muestra), **la estrategia de nonce, que se puede cambiar**, y el historial de movimientos. El botón **Usar** te cambia a esa billetera. |
+| **Botón Nueva billetera** *(administrador)* | Crea una billetera de la simulación, custodiada por el servidor. |
+| **Tabla** | Todas las billeteras. La columna **Clave en** dice dónde vive la clave privada: **servidor** (las de la simulación: Alice, Bob, Carol…) o **dispositivo** (las de los participantes). Además: dirección, saldo confirmado, disponible (descontando lo pendiente), próximo seq, estrategia de nonce y estado ("clave expuesta" si aplica). |
+| **Inspector** | Saldo, cuántas firmas publicó, dirección y clave pública (la privada nunca se muestra), la estrategia de nonce (el administrador la puede cambiar en las billeteras del servidor) y el historial. El botón **Usar** cambia la billetera con la que firma el administrador. |
 
 **Qué concepto ilustra:** que la clave pública es pública y la privada no; y que la
 estrategia de nonce es una decisión de la billetera, no de la red. Cambiarla solo
@@ -187,7 +235,7 @@ afecta las firmas futuras ([4.10](04-vulnerabilidad.md#410-la-defensa)).
 
 ---
 
-## 6.6 Seguridad · Integridad
+## 6.7 Seguridad · Integridad
 
 **Propósito:** comprobar que nadie manipuló la cadena, y experimentar con
 manipulaciones para ver qué regla las detecta.
@@ -231,7 +279,7 @@ reescribir la historia no pasa desapercibido.
 
 ---
 
-## 6.7 Seguridad · Análisis de firmas
+## 6.8 Seguridad · Análisis de firmas
 
 **Propósito:** auditar todas las firmas publicadas en busca de nonces repetidos,
 demostrar la recuperación de la clave y la explotación, y comparar con la defensa.
@@ -262,7 +310,7 @@ en el resto de la aplicación). **Reanalizar** lo fuerza.
 
 ---
 
-## 6.8 Laboratorio · Curva elíptica
+## 6.9 Laboratorio · Curva elíptica
 
 **Propósito:** ver con los ojos cómo funciona el grupo de puntos de una curva
 elíptica, con una curva lo bastante pequeña como para dibujarla.
@@ -280,7 +328,7 @@ Está dividida en tres columnas, como una herramienta de trabajo:
 
 ---
 
-## 6.9 Laboratorio · ECDSA
+## 6.10 Laboratorio · ECDSA
 
 **Propósito:** firmar un mensaje viendo todos los valores intermedios,
 incluido el nonce k (que en una billetera real nunca se muestra), y reproducir el
@@ -301,7 +349,7 @@ vulnerabilidad a pequeña escala.
 
 ---
 
-## 6.10 Escenario
+## 6.11 Escenario
 
 **Propósito:** configurar la simulación y volver a generarla.
 
@@ -319,7 +367,7 @@ se pierden los bloques, transacciones y billeteras creadas desde la última vez.
 
 ---
 
-## 6.11 Atajos
+## 6.12 Atajos
 
 | Atajo | Acción |
 |---|---|

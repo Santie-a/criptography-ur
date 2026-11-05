@@ -67,6 +67,13 @@ class RawTransaction(BaseModel):
     signature: str = Field(..., max_length=128, description="r || s en hex (64 bytes)")
 
 
+class ParticipantRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=24)
+    pubkey: str = Field(..., min_length=66, max_length=66, description="clave pública comprimida (hex)")
+    signature: str = Field(..., min_length=128, max_length=128,
+                           description="firma de 'minichain:registro:{name}:{pubkey}' (r || s)")
+
+
 class MineRequest(BaseModel):
     miner: str = Field(..., description="nombre de billetera o dirección que cobra la recompensa")
     difficulty: int | None = Field(None, ge=0, description="opcional; nunca menor que la de la red")
@@ -209,6 +216,18 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     @app.get("/api/transactions/{txid}", tags=["transacciones"], summary="Detalle de una transacción")
     async def transaction(txid: str):
         return await run_in_threadpool(net.transaction, txid)
+
+    @app.post("/api/participants", tags=["billeteras"], dependencies=public_write,
+              summary="Registrar el nombre de una billetera de dispositivo (firmado con su clave)")
+    async def register_participant(req: ParticipantRequest):
+        p = await run_in_threadpool(net.register_participant, req.name, req.pubkey, req.signature)
+        await changed("participant", name=p["name"])
+        return p
+
+    @app.get("/api/accounts/{address}", tags=["billeteras"],
+             summary="Saldo y siguiente seq de una dirección")
+    async def account(address: str):
+        return await run_in_threadpool(net.account, address)
 
     @app.get("/api/wallets/{name}", tags=["billeteras"], summary="Billetera con su historial")
     async def wallet_detail(name: str):

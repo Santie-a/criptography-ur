@@ -85,6 +85,8 @@ público con límite de peticiones por IP.
 | GET | `/api/transactions` | público | Transacciones confirmadas (filtro opcional `?address=`) |
 | GET | `/api/transactions/{txid}` | público | Una transacción con su bloque y prueba Merkle |
 | GET | `/api/wallets/{nombre}` | público | Billetera con su historial |
+| POST | `/api/participants` | límite | Registrar el nombre de una billetera de dispositivo. Va firmado: `minichain:registro:{nombre}:{clave pública}` |
+| GET | `/api/accounts/{dirección}` | público | Saldo, disponible y siguiente `seq` de cualquier dirección (lo que necesita un dispositivo para firmar) |
 | POST | `/api/wallets` | admin | Crear una billetera custodiada por el servidor |
 | PUT | `/api/wallets/{nombre}/nonce` | admin | Cambiar su estrategia de nonce |
 | POST | `/api/transactions/transfer` | admin | El servidor firma con una billetera custodiada |
@@ -131,8 +133,9 @@ curl -s -X POST localhost:8000/api/mine -H 'Content-Type: application/json' -d '
 curl -s localhost:8000/api/attack/scan | python -m json.tool | head -40
 ```
 
-Un cliente con **su propia clave**, que el servidor nunca ve (así funcionaría una
-billetera real):
+Un cliente con **su propia clave**, que el servidor nunca ve. Es lo mismo que hace
+la página *Mi billetera* en el navegador (`frontend/src/wallet/crypto.ts`), aquí en
+Python:
 
 ```python
 import json, urllib.request

@@ -1,17 +1,19 @@
 // Resumen: estado de la red de un vistazo y alertas de seguridad.
 // Las alertas son la puerta de entrada al análisis: el sistema detecta el
 // problema y el usuario profundiza, como en una herramienta de monitoreo.
-import { ArrowRight, Hammer, Send } from "lucide-react";
+import { ArrowRight, Hammer, Send, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ChainStrip } from "../components/chain";
 import { Button, Hex, Metrics, Notice, NonceTag, PageHeader, Panel, Tag, fmtAgo } from "../components/ui";
 import { go, href } from "../router";
 import { useStore } from "../store";
+import { useDeviceWallet } from "../wallet/device";
 import type { TxRow, ValidationResult } from "../types";
 
 export function Dashboard() {
   const { state, scan, openDialog, isAdmin } = useStore();
+  const [device] = useDeviceWallet();
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [integrity, setIntegrity] = useState<ValidationResult | null>(null);
 
@@ -42,6 +44,12 @@ export function Dashboard() {
             el mismo r, así que reutilizaron el nonce k. Cualquiera que lea la cadena puede calcular la clave.
           </Notice>
         ))}
+        {!isAdmin && !device && (
+          <Notice title="Únete a la red"
+            actions={<Button size="sm" variant="primary" icon={<Smartphone size={12} />} onClick={() => go("billetera")}>Crear mi billetera</Button>}>
+            Crea una billetera en este dispositivo para recibir y enviar monedas. Tu clave privada nunca sale de aquí.
+          </Notice>
+        )}
         {exposed.length === 0 && weakWallets.length > 0 && (
           <Notice tone="warn" title="Billeteras con generador de nonces inseguro">
             {weakWallets.map((w) => w.name).join(", ")} {weakWallets.length === 1 ? "usa" : "usan"} una estrategia de nonce que puede repetir k.
@@ -54,6 +62,7 @@ export function Dashboard() {
           { label: "Dificultad", value: `${state.difficulty} bits`, sub: `≈ ${(2 ** state.difficulty).toLocaleString("es")} intentos por bloque` },
           { label: "Firmas en la cadena", value: signatures, sub: `${scan?.unique_r ?? "—"} valores de r distintos` },
           { label: "Pendientes", value: state.mempool.length, sub: "en la mempool" },
+          { label: "Participantes", value: state.participants.length, sub: "billeteras en dispositivos" },
           { label: "Claves expuestas", value: exposed.length, sub: "por reutilización de nonce", tone: exposed.length ? "bad" : undefined },
         ]} />
 

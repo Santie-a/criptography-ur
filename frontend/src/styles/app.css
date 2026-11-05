@@ -452,3 +452,30 @@ dialog.modal::backdrop { background: rgb(17 17 19 / 0.55); }
   .statusbar > span.hide-sm { display: none; }
   .metric { border-bottom: 1px solid var(--border-subtle); }
 }
+
+/* ======================================================================
+   Mi billetera (móvil primero)
+   ====================================================================== */
+
+.stack-lg { display: flex; flex-direction: column; gap: var(--s-4); }
+.wallet-page { max-width: 1080px; }
+.wallet-grid { display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.balance { display: flex; flex-direction: column; gap: var(--s-2); }
+.balance-name { font-weight: 600; font-size: var(--text-lg); }
+.balance-amount { font-size: 3rem; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; margin-top: var(--s-3); }
+.avatar.lg { width: 40px; height: 40px; font-size: 14px; }
+.address-box { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); background: var(--layer-2); }
+.address-box code { flex: 1; min-width: 0; word-break: break-all; font-size: var(--text-xs); }
+ul.bullet { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.signed-details summary { cursor: pointer; color: var(--accent-text); padding: var(--s-1) 0; }
+.signed-details[open] summary { margin-bottom: var(--s-2); }
+.header .identity.device { text-decoration: none; color: var(--header-text); }
+.header .identity.device:hover { background: var(--header-hover); }
+@media (max-width: 1000px) {
+  .wallet-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .balance-amount { font-size: 2.5rem; }
+  /* En el celular los controles son más altos: más fáciles de tocar. */
+  .wallet-page .btn, .wallet-page .input, .wallet-page .select { height: 44px; font-size: var(--text-base); }
+}

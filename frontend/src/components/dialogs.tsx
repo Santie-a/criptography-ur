@@ -24,7 +24,7 @@ export function Dialogs() {
 function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, identity, run, notify } = useStore();
   const me = state?.wallets.find((w) => w.name === identity);
-  const others = state?.wallets.filter((w) => w.name !== identity) ?? [];
+  const others = [...(state?.wallets ?? []), ...(state?.participants ?? [])].filter((w) => w.name !== identity);
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState(10);
   const [memo, setMemo] = useState("");

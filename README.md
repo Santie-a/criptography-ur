@@ -41,8 +41,8 @@ y abre http://localhost:5173.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest                 # 71 pruebas: núcleo, comparación con `ecdsa`, API, roles y persistencia
-cd frontend && npm run typecheck
+python -m pytest                 # 80 pruebas: núcleo, comparación con `ecdsa`, API, roles, persistencia y billeteras de dispositivo
+cd frontend && npm test && npm run typecheck   # 5 pruebas de la billetera del navegador
 ```
 
 Con `make` instalado, `make install`, `make run`, `make test` y `make demo` hacen lo mismo.
@@ -55,6 +55,7 @@ estado), no como una secuencia de pasos:
 
 | Sección | Qué hay |
 |---|---|
+| **Tú · Mi billetera** | Tu billetera en el celular o PC: la clave privada se genera y se queda en el dispositivo; desde aquí se recibe y se envía firmando localmente. |
 | **Red · Resumen** | Métricas de la red, últimos bloques y transacciones, integridad y alertas de seguridad. |
 | **Red · Bloques** | Tabla de bloques e inspector con encabezado, transacciones, árbol de Merkle y prueba de inclusión. |
 | **Red · Transacciones** | Confirmadas y pendientes; cada una con su firma (r, s), el mensaje firmado y su prueba Merkle. |
@@ -75,8 +76,10 @@ billeteras.
 Laboratorio · ECDSA → Bloques → Integridad → Análisis de firmas (explotar y
 comparar estrategias) → Escenario (regenerar con RFC 6979).
 
-Varios navegadores pueden conectarse a la vez: comparten la red, cada uno elige
-con qué billetera firma y los cambios llegan en tiempo real por WebSocket.
+Varios dispositivos pueden conectarse a la vez y comparten la red en tiempo real.
+Cada participante tiene su billetera en su propio dispositivo; quien tiene el token
+de administrador controla la simulación (las billeteras de Alice, Bob y Carol,
+minar, manipular y explotar). Ver [roles](docs/CONECTAR_UI.md#roles).
 
 ## Estructura
 
