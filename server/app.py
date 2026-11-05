@@ -165,11 +165,14 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                            allow_methods=["*"], allow_headers=["*"])
 
-    auth = AdminAuth(settings.admin_token)
+    auth = AdminAuth(settings.admin_token, settings.production)
     limited = RateLimiter(settings.rate_limit, auth)
     admin = [Depends(auth)]
     public_write = [Depends(limited)]
-    if not auth.required:
+    if auth.locked:
+        log.error("producción sin MINICHAIN_ADMIN_TOKEN: las acciones de administrador quedan "
+                  "bloqueadas hasta configurarlo.")
+    elif not auth.required:
         log.warning("MINICHAIN_ADMIN_TOKEN no está definido: modo abierto, cualquiera es "
                     "administrador. No lo uses así en una URL pública.")
 
@@ -208,7 +211,7 @@ def create_app(settings: Settings = default_settings, network: Network | None = 
     # ---------------------------------------------------------- red
 
     def auth_info(request: Request) -> dict:
-        return {"required": auth.required, "admin": auth.is_admin(request)}
+        return {"required": auth.required, "admin": auth.is_admin(request), "locked": auth.locked}
 
     @app.get("/api/health", tags=["red"])
     async def health(request: Request):

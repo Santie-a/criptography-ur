@@ -1,0 +1,31 @@
+# Blueprint de Render: un servicio web gratuito con la API y la UI compilada.
+# Guía paso a paso en docs/DESPLIEGUE.md (Opción 3).
+services:
+  - type: web
+    name: minichain
+    runtime: docker
+    plan: free
+    region: virginia            # misma zona que Supabase us-east-1: menos latencia con la base
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Cadena de conexión de Supabase (session pooler, IPv4). Secreta: se
+      # escribe en el panel de Render, nunca en el repositorio.
+      - key: DATABASE_URL
+        sync: false
+      # Render genera un valor aleatorio. Para verlo: servicio → Environment.
+      - key: MINICHAIN_ADMIN_TOKEN
+        generateValue: true
+      # Sin token no hay "modo abierto": nadie es administrador.
+      - key: MINICHAIN_ENV
+        value: production
+      - key: MINICHAIN_AUTOMINE
+        value: "20"
+      - key: MINICHAIN_FAUCET
+        value: "25"
+      # La CPU gratuita es lenta: se limita la dificultad por bloque.
+      - key: MINICHAIN_MAX_DIFFICULTY
+        value: "18"

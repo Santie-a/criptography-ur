@@ -112,7 +112,9 @@ público con límite de peticiones por IP.
 
 - Sin `MINICHAIN_ADMIN_TOKEN` el servidor está en **modo abierto**: todos son
   administradores. Sirve para desarrollo local; en una URL pública hay que
-  definirlo siempre. El servidor lo advierte en el registro, y la interfaz muestra
+  definirlo siempre. En producción (`MINICHAIN_ENV=production`, o en Render) un
+  token olvidado no abre nada: el servidor queda **bloqueado** y nadie es
+  administrador hasta configurarlo. El servidor lo advierte en el registro, y la interfaz muestra
   "modo abierto" en el encabezado.
 - El token se compara en tiempo constante y viaja en el encabezado
   `Authorization`, nunca en la URL.
@@ -190,6 +192,7 @@ Ejemplo: mostrar cuántos bits en cero tiene cada hash de bloque.
 | `DATABASE_URL` | vacío | PostgreSQL donde se guarda la red (Supabase, *session pooler*) |
 | `MINICHAIN_STATE_FILE` | vacío | Alternativa local: guardar la red en un archivo JSON |
 | `MINICHAIN_ADMIN_TOKEN` | vacío | Token del administrador. Vacío = modo abierto (solo desarrollo) |
+| `MINICHAIN_ENV` | vacío | `production`: sin token, nadie es administrador (en vez de todos). En Render se activa solo, porque Render define `RENDER` |
 | `MINICHAIN_RATE_LIMIT` | `60` | Escrituras públicas por minuto y por IP (0 = sin límite) |
 | `MINICHAIN_AUTOMINE` | `0` | Minar la mempool cada N segundos (0 = solo minado manual). El administrador lo cambia en Escenario hasta el siguiente reinicio |
 | `MINICHAIN_FAUCET` | `25` | Monedas de bienvenida para cada billetera de dispositivo nueva (0 = desactivado) |

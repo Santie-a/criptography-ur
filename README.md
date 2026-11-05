@@ -37,6 +37,9 @@ y abre http://localhost:5173.
 
 **Docker**: `docker compose up --build` y abre http://localhost:8000.
 
+**En internet (Render + Supabase, gratis)**: el `render.yaml` de la raíz describe el
+servicio; los pasos están en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md#opción-3-render--supabase-producción-gratuita).
+
 **Pruebas**:
 
 ```bash
@@ -187,7 +190,8 @@ nonce en la cadena, está comprometida.
 - Modelo de cuentas con contador `seq` (anti-replay) en lugar de UTXO.
 - Dirección = primeros 20 bytes de SHA-256(clave pública comprimida), sin RIPEMD-160 ni Base58Check.
 - Las firmas no se normalizan a low-s.
-- En el servidor, las billeteras de la demo son custodiadas por el servidor y no
-  hay autenticación (ver [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md)).
+- Las billeteras de la demo (Alice, Bob…) las custodia el servidor y solo las usa el
+  administrador; las de los participantes viven en su dispositivo. Roles y límites
+  en [docs/CONECTAR_UI.md](docs/CONECTAR_UI.md#roles).
 - La multiplicación escalar no es de tiempo constante: es correcta, pero no
   resiste ataques de canal lateral. No usar para proteger dinero real.

@@ -114,39 +114,46 @@ solo se usa como base de datos: la lógica y la validación siguen en el servido
 
 No hace falta crear tablas: el servidor las crea al arrancar.
 
-### Paso 2. Crear el servicio en Render
+### Paso 2. Crear el servicio en Render con el Blueprint
 
-> Esta parte se terminará de automatizar con un `render.yaml` en una etapa
-> posterior. Estos son los pasos manuales equivalentes.
+El archivo [`render.yaml`](../render.yaml) de la raíz describe el servicio completo
+(un *Blueprint*): Docker, plan gratuito, región Virginia, chequeo de salud en
+`/api/health` y estas variables:
 
-1. En [dashboard.render.com](https://dashboard.render.com), **New → Web Service**,
-   y conecta el repositorio de GitHub `santie-a/criptography-ur`, rama `main`.
-2. Configuración:
-   - **Language / Runtime**: Docker (usa el `Dockerfile` del repositorio).
-   - **Region**: **Virginia (US East)**.
-   - **Instance type**: Free.
-   - **Health check path**: `/api/health`.
-3. **Environment variables**:
+| Variable | Valor | Quién lo pone |
+|---|---|---|
+| `DATABASE_URL` | La cadena del paso 1 | **Tú**, en el panel de Render (`sync: false`: nunca va al repositorio) |
+| `MINICHAIN_ADMIN_TOKEN` | Aleatorio | **Render lo genera** (`generateValue: true`). Para verlo: servicio → *Environment* |
+| `MINICHAIN_ENV` | `production` | El Blueprint. Si faltara el token, nadie sería administrador (en vez de todos) |
+| `MINICHAIN_AUTOMINE` | `20` | El Blueprint: mina la mempool cada 20 s |
+| `MINICHAIN_FAUCET` | `25` | El Blueprint: monedas de bienvenida |
+| `MINICHAIN_MAX_DIFFICULTY` | `18` | El Blueprint: la CPU gratuita es lenta |
 
-   | Variable | Valor |
-   |---|---|
-   | `DATABASE_URL` | La cadena del paso 1. Márcala como secreta. |
-   | `MINICHAIN_ADMIN_TOKEN` | Un valor largo y aleatorio, por ejemplo el que imprime `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Márcalo como secreto. **Sin esta variable, cualquiera con la URL controla la red.** |
-   | `MINICHAIN_CORS` | vacío (la UI se sirve desde el mismo dominio) |
-   | `MINICHAIN_MAX_DIFFICULTY` | `18` (la CPU gratuita es lenta) |
-   | `MINICHAIN_AUTOMINE` | `20` (mina la mempool cada 20 s; así nadie tiene que pulsar Minar) |
-   | `MINICHAIN_FAUCET` | `25` (es el valor por defecto; `0` lo desactiva) |
+`PORT` lo asigna Render y el servidor lo lee solo. Tampoco hace falta
+`MINICHAIN_PUBLIC_URL`: Render define `RENDER_EXTERNAL_URL` y el código QR de
+**Invitar** la usa.
 
-   `PORT` lo asigna Render y el servidor lo lee solo. Tampoco hace falta
-   `MINICHAIN_PUBLIC_URL`: Render define `RENDER_EXTERNAL_URL` y el código QR de
-   **Invitar** la usa.
-4. **Create Web Service**. El primer despliegue tarda unos minutos (compila la UI
-   y la imagen). Al terminar, la aplicación queda en
-   `https://<nombre>.onrender.com`.
-5. Comprueba `https://<nombre>.onrender.com/api/health`. Debe decir
-   `"storage": {"kind": "postgres", "ok": true, ...}` y `"auth": {"required": true, ...}`.
-6. Abre la aplicación, pulsa **Administrar** en el encabezado e ingresa el token.
-   Debe aparecer "Administrador" y los botones Transferir y Minar.
+1. En [dashboard.render.com](https://dashboard.render.com), **New → Blueprint** y
+   elige el repositorio `santie-a/criptography-ur`, rama `main`.
+2. Render lee `render.yaml` y muestra lo que va a crear: un servicio web
+   `minichain`, plan Free. Te pide el valor de `DATABASE_URL`: pega la cadena del
+   paso 1.
+3. **Apply**. El primer despliegue tarda unos minutos (compila la UI y la imagen).
+   Al terminar, la aplicación queda en `https://minichain-<sufijo>.onrender.com`.
+4. Comprueba `https://<tu-url>/api/health`. Debe decir
+   `"storage": {"kind": "postgres", "ok": true, ...}` y
+   `"auth": {"required": true, ..., "locked": false}`.
+5. Copia el token desde *Environment → MINICHAIN_ADMIN_TOKEN* (ícono del ojo).
+   Abre la aplicación, pulsa **Administrar** e ingrésalo. Debe aparecer
+   "Administrador" y los botones Transferir y Minar.
+
+Con `autoDeploy`, cada push a `main` vuelve a desplegar. Las variables que pusiste
+o que generó Render no se tocan en los despliegues siguientes.
+
+> **Sin Blueprint.** Si prefieres crear el servicio a mano (**New → Web Service**),
+> usa los mismos valores: runtime Docker, región Virginia, plan Free, health check
+> `/api/health` y las variables de la tabla (el token lo generas tú con
+> `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
 
 ### Paso 3. Comprobar que la red sobrevive reinicios
 

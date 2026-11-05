@@ -102,7 +102,7 @@ export interface NetworkState {
   clients: number;
   storage: { kind: string; ok: boolean; error: string | null; restored: boolean };
   /** required: el servidor exige token; admin: este navegador lo tiene. */
-  auth: { required: boolean; admin: boolean };
+  auth: { required: boolean; admin: boolean; locked?: boolean };
   /** Monedas que regala `wallet` a cada participante nuevo (0 = desactivado). */
   faucet: { amount: number; wallet: string };
   automine: Automine;

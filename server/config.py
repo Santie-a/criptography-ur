@@ -37,6 +37,9 @@ class Settings:
     # Token del administrador. Sin él, el servidor está en modo abierto (todos
     # son administradores): solo para desarrollo local.
     admin_token: str | None = os.getenv("MINICHAIN_ADMIN_TOKEN") or None
+    # Producción: sin token no hay modo abierto (ver server/security.py).
+    # Render define RENDER=true en todos sus servicios.
+    production: bool = os.getenv("MINICHAIN_ENV", "").lower() == "production" or bool(os.getenv("RENDER"))
     # Peticiones públicas de escritura por minuto y por IP (0 = sin límite).
     rate_limit: int = int(os.getenv("MINICHAIN_RATE_LIMIT", "60"))
     # Monedas que regala Minera a cada participante nuevo (0 = desactivado).

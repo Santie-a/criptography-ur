@@ -49,8 +49,8 @@ def test_admin_routes_reject_without_token(method, path, body):
 
 def test_admin_token_grants_access_and_state_reports_role():
     with make_client() as c:
-        assert c.get("/api/state").json()["auth"] == {"required": True, "admin": False}
-        assert c.get("/api/state", headers=ADMIN).json()["auth"] == {"required": True, "admin": True}
+        assert c.get("/api/state").json()["auth"] == {"required": True, "admin": False, "locked": False}
+        assert c.get("/api/state", headers=ADMIN).json()["auth"] == {"required": True, "admin": True, "locked": False}
         assert c.get("/api/admin/check", headers=ADMIN).json() == {"ok": True}
         assert c.post("/api/transactions/transfer", headers=ADMIN,
                       json={"sender": "Alice", "recipient": "Bob", "amount": 1}).status_code == 200
@@ -86,6 +86,19 @@ def test_rate_limit_applies_to_public_writes_but_not_admin():
 
 def test_open_mode_without_token():
     with make_client(token=None, rate_limit=1) as c:
-        assert c.get("/api/state").json()["auth"] == {"required": False, "admin": True}
+        assert c.get("/api/state").json()["auth"] == {"required": False, "admin": True, "locked": False}
         assert c.post("/api/mine", json={"miner": "Alice"}).status_code == 200
         assert all(c.post("/api/lab/ecdsa/sign", json={"message": "x"}).status_code == 200 for _ in range(3))
+
+
+def test_production_without_token_is_locked_not_open():
+    settings = Settings(cors_origins=[], frontend_dist=Path("/nonexistent"), admin_token=None, production=True)
+    c = TestClient(create_app(settings, Network(ScenarioParams(seed=11, difficulty=4))))
+    auth = c.get("/api/health").json()["auth"]
+    assert auth == {"required": True, "admin": False, "locked": True}
+    r = c.post("/api/mine", json={"miner": "Alice"})
+    assert r.status_code == 401 and "no tiene MINICHAIN_ADMIN_TOKEN" in r.json()["detail"]
+    assert c.post("/api/mine", json={"miner": "Alice"},
+                  headers={"Authorization": "Bearer cualquier-cosa"}).status_code == 401
+    # Leer sigue siendo público.
+    assert c.get("/api/state").status_code == 200

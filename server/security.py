@@ -13,6 +13,9 @@ Dos roles:
 Sin MINICHAIN_ADMIN_TOKEN el servidor está en "modo abierto": todo el mundo es
 administrador. Sirve para desarrollo local y nunca debe usarse en una URL
 pública (el servidor lo advierte en el registro y en /api/health).
+
+En producción (MINICHAIN_ENV=production, o en Render) falta de token no abre
+nada: queda "bloqueado" y nadie es administrador hasta configurarlo.
 """
 
 from __future__ import annotations
@@ -26,14 +29,18 @@ from fastapi import HTTPException, Request
 
 
 class AdminAuth:
-    def __init__(self, token: str | None):
+    def __init__(self, token: str | None, production: bool = False):
         self.token = token or None
+        # En producción, un token olvidado no debe convertir a todos en administradores.
+        self.locked = production and self.token is None
 
     @property
     def required(self) -> bool:
-        return self.token is not None
+        return self.token is not None or self.locked
 
     def is_admin(self, request: Request) -> bool:
+        if self.locked:
+            return False
         if not self.required:
             return True
         header = request.headers.get("authorization", "")
@@ -46,8 +53,9 @@ class AdminAuth:
     def __call__(self, request: Request) -> None:
         """Dependencia de FastAPI para las rutas de administrador."""
         if not self.is_admin(request):
-            raise HTTPException(status_code=401,
-                                detail="Esta acción requiere el token de administrador.",
+            detail = ("El servidor no tiene MINICHAIN_ADMIN_TOKEN configurado: nadie puede administrar."
+                      if self.locked else "Esta acción requiere el token de administrador.")
+            raise HTTPException(status_code=401, detail=detail,
                                 headers={"WWW-Authenticate": "Bearer"})
 
 

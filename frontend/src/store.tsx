@@ -106,7 +106,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       await api.checkAdmin(token);
     } catch (e) {
-      notify(e instanceof ApiError && e.status === 401 ? "Token incorrecto." : String(e), "bad");
+      const locked = e instanceof ApiError && e.status === 401 && e.message.includes("no tiene MINICHAIN_ADMIN_TOKEN");
+      notify(e instanceof ApiError && e.status === 401 && !locked ? "Token incorrecto." : e instanceof Error ? e.message : String(e), "bad");
       return false;
     }
     setAdminToken(token);
