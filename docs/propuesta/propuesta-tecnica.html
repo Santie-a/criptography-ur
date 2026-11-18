@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta técnica · minichain</title>
+<style>
+  @page { size: Letter; margin: 1.8cm 2cm 1.8cm; }
+  :root {
+    --ink: #1d1d1f;
+    --muted: #55565b;
+    --rule: #8b1e2d;      /* el rojo del enunciado del curso */
+    --soft: #f4f1f1;
+    --line: #d6d3d4;
+    --secret: #b3261e;
+    --public: #2f5d8a;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 10pt; }
+  body { margin: 0; color: var(--ink); font-family: "Latin Modern Roman", "CMU Serif", Georgia, "Times New Roman", serif; line-height: 1.42; }
+  .runhead { display: flex; justify-content: space-between; font-size: 9pt; color: var(--muted); border-bottom: 1px solid var(--rule); padding-bottom: 3pt; margin-bottom: 14pt; }
+  h1 { font-size: 16pt; margin: 0 0 4pt; line-height: 1.2; }
+  .sub { color: var(--muted); margin: 0 0 6pt; }
+  .members { font-size: 9.5pt; margin: 0 0 10pt; }
+  h2 { font-size: 12.5pt; margin: 12pt 0 5pt; padding-bottom: 2pt; border-bottom: 1px solid var(--rule); color: var(--ink); break-after: avoid; }
+  h2 span { color: var(--rule); margin-right: 4pt; }
+  h3 { font-size: 10.5pt; margin: 8pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; text-align: justify; hyphens: auto; }
+  ul, ol { margin: 0 0 6pt; padding-left: 16pt; }
+  li { margin-bottom: 2pt; }
+  code, .mono { font-family: "Latin Modern Mono", "CMU Typewriter Text", "Courier New", monospace; font-size: 9.5pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 4pt 0 8pt; }
+  tr { break-inside: avoid; }
+  th { text-align: left; background: var(--soft); border-bottom: 1px solid var(--rule); padding: 4pt 6pt; }
+  td { padding: 4pt 6pt; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { font-weight: bold; width: 21%; }
+  .box { border-left: 2.5pt solid var(--rule); background: var(--soft); padding: 6pt 9pt; margin: 6pt 0 8pt; }
+  .box p:last-child { margin: 0; }
+  figure { margin: 4pt 0 6pt; break-inside: avoid; }
+  figure svg { width: 92%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 9pt; color: var(--muted); text-align: center; margin-top: 2pt; }
+  .legend { display: flex; gap: 14pt; justify-content: center; font-size: 8.5pt; color: var(--muted); margin-top: 3pt; }
+  .legend i { display: inline-block; width: 16pt; height: 0; border-top: 2pt solid; vertical-align: middle; margin-right: 4pt; }
+  .keep { break-inside: avoid; }
+  .page-break { break-before: page; }
+</style>
+</head>
+<body>
+
+<div class="runhead"><span>Introducción a la criptografía · Universidad del Rosario · 2026-II</span><span>Proyecto final · Propuesta técnica</span></div>
+
+<h1>Firmas que delatan la clave: ECDSA en una blockchain y el ataque por nonce repetido</h1>
+<p class="sub">Proyecto <em>minichain</em>: una cadena de bloques pequeña, con la criptografía programada desde cero, para mostrar cómo una firma mal generada entrega la clave privada a cualquiera que lea los datos públicos.</p>
+<p class="members"><strong>Integrantes:</strong> [Nombre 1] · [Nombre 2] · [Nombre 3]</p>
+
+<!-- ====================================================== 1 -->
+<h2><span>1.</span>Problema y contexto</h2>
+
+<p><strong>Qué se protege.</strong> En una blockchain no hay usuarios ni contraseñas: quien tiene la clave privada de una cuenta es el dueño de su dinero. Cada transacción va firmada, y la red solo acepta un pago si la firma corresponde a la clave pública del emisor. Lo que hay que proteger es, entonces, <em>la clave privada</em> (para que nadie más pueda gastar) y <em>la historia de la cadena</em> (para que nadie cambie pagos pasados).</p>
+
+<p><strong>De quién.</strong> De cualquier persona que lea la cadena. La cadena es pública a propósito: todos pueden ver cada transacción y cada firma. El atacante de este proyecto (Mallory) no entra a ningún computador ni intercepta nada; solo descarga los datos públicos y hace cuentas. También nos protegemos de quien quiera modificar registros ya guardados.</p>
+
+<p><strong>Por qué importa.</strong> ECDSA, el algoritmo de firma de Bitcoin, es seguro, pero exige que cada firma use un número secreto de un solo uso, el <em>nonce</em> <span class="mono">k</span>. Si una billetera repite ese número en dos firmas, la clave privada se puede despejar con dos ecuaciones. No es un caso teórico: en 2010 se extrajo la clave con la que Sony firmaba el software de la PlayStation 3, porque usaba siempre el mismo <span class="mono">k</span>; en 2013 se robaron bitcoins de billeteras de Android cuyo generador de números aleatorios repetía valores. Además, el sistema no puede defenderse después: una firma hecha con la clave robada es idéntica a una del dueño, y una transacción en la cadena no se puede revertir.</p>
+
+<div class="box"><p><strong>Pregunta del proyecto.</strong> ¿Cómo una implementación defectuosa de ECDSA revela la clave privada a partir de datos que todos pueden ver, por qué el validador no lo puede impedir, y cómo se evita?</p></div>
+
+<!-- ====================================================== 2 -->
+<h2><span>2.</span>Primitivas criptográficas escogidas</h2>
+
+<table>
+  <thead><tr><th>Primitiva</th><th>Para qué la usamos</th><th>Por qué esta</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>ECDSA sobre la curva secp256k1</td>
+      <td>Firmar cada transacción. Garantiza que el pago lo autorizó el dueño de la clave (autenticidad) y que nadie lo modificó después (integridad).</td>
+      <td>Es la que usan Bitcoin y Ethereum, así que el ataque es el real. Con claves de 256 bits da unos 128 bits de seguridad, frente a los 3072 bits que necesitaría RSA. Su seguridad descansa en que, conocidos <span class="mono">G</span> y <span class="mono">Q = d·G</span>, no se puede calcular <span class="mono">d</span> (logaritmo discreto). La programamos desde cero para ver exactamente dónde entra el nonce.</td>
+    </tr>
+    <tr>
+      <td>SHA-256</td>
+      <td>Resumir el mensaje antes de firmarlo, identificar transacciones y bloques, derivar direcciones, la prueba de trabajo y el árbol de Merkle.</td>
+      <td>Es resistente a colisiones y a preimágenes: no se pueden encontrar dos mensajes con el mismo resumen ni recuperar el mensaje a partir del resumen. Su salida de 256 bits coincide con el tamaño del orden de la curva.</td>
+    </tr>
+    <tr>
+      <td>Árbol de Merkle (con SHA-256)</td>
+      <td>Resumir todas las transacciones de un bloque en un solo hash, la raíz, y probar que una transacción está en el bloque con pocos datos.</td>
+      <td>Cambiar una sola transacción cambia la raíz. Usamos prefijos distintos para hojas y nodos internos, que evitan confundir uno con otro.</td>
+    </tr>
+    <tr>
+      <td>Encadenamiento por hash y prueba de trabajo</td>
+      <td>Cada bloque guarda el hash del anterior, y su propio hash debe empezar con cierta cantidad de ceros.</td>
+      <td>Alterar un bloque viejo rompe el enlace con el siguiente; rehacerlo obliga a volver a minar ese bloque y todos los posteriores, lo que hace costoso reescribir la historia.</td>
+    </tr>
+    <tr>
+      <td>RFC 6979 (nonce determinista con HMAC-SHA-256)</td>
+      <td>Generar el nonce <span class="mono">k</span> de cada firma a partir de la clave privada y del mensaje.</td>
+      <td>Es la defensa. Ya no depende de un generador aleatorio: mensajes distintos dan nonces distintos e impredecibles, y el mismo mensaje da la misma firma, que no sirve para el ataque.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Lo que no usamos, a propósito: cifrado.</strong> La cadena no oculta nada; la confidencialidad no es un objetivo. La criptografía aquí sirve para <em>firmar</em> (quién autorizó) y para <em>resumir</em> (detectar cambios). Esa diferencia es parte de lo que el proyecto quiere mostrar.</p>
+
+<h3>La idea matemática del ataque</h3>
+<p>Una firma es el par <span class="mono">(r, s)</span> con <span class="mono">r = (k·G).x mod n</span> y <span class="mono">s = k⁻¹(z + r·d) mod n</span>, donde <span class="mono">z</span> es el hash del mensaje y <span class="mono">d</span> la clave privada. Una sola firma es una ecuación con dos incógnitas (<span class="mono">k</span> y <span class="mono">d</span>) y no revela nada. Si dos firmas comparten <span class="mono">k</span>, comparten también <span class="mono">r</span>, y el atacante tiene dos ecuaciones con las mismas dos incógnitas:</p>
+<p style="text-align:center" class="mono">k = (z₁ − z₂)·(s₁ − s₂)⁻¹ mod n &nbsp;&nbsp;&nbsp;&nbsp; d = (s₁·k − z₁)·r⁻¹ mod n</p>
+
+<!-- ====================================================== 3 -->
+<h2 class="page-break-avoid"><span>3.</span>Diseño del sistema: flujo de datos y claves</h2>
+
+<p>El sistema tiene tres piezas: el <strong>dispositivo</strong> de cada participante (celular o PC), donde se crea y se guarda su clave privada; el <strong>servidor</strong>, que verifica firmas, agrupa transacciones en bloques y los mina; y la <strong>cadena</strong>, guardada en una base de datos y visible para todos. El diagrama distingue lo secreto (rojo) de lo público (azul).</p>
+
+<figure>
+<svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, 'Times New Roman', serif" font-size="12">
+  <defs>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5d8a"/></marker>
+    <marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#55565b"/></marker>
+  </defs>
+
+  <!-- Dispositivo -->
+  <rect x="10" y="20" width="200" height="170" fill="#ffffff" stroke="#1d1d1f" stroke-width="1.2"/>
+  <text x="110" y="40" text-anchor="middle" font-weight="bold" font-size="13">Dispositivo del usuario</text>
+  <text x="110" y="56" text-anchor="middle" fill="#55565b" font-size="10.5">celular o PC</text>
+  <rect x="24" y="66" width="172" height="40" fill="#fbeceb" stroke="#b3261e" stroke-width="1"/>
+  <text x="110" y="83" text-anchor="middle" fill="#b3261e" font-weight="bold">clave privada d</text>
+  <text x="110" y="98" text-anchor="middle" fill="#b3261e" font-size="10.5">se genera y se queda aquí</text>
+  <text x="24" y="126" font-size="11">1. Q = d · G  (clave pública)</text>
+  <text x="24" y="144" font-size="11">2. z = SHA-256(transacción)</text>
+  <text x="24" y="162" font-size="11">3. k = RFC 6979(d, z)</text>
+  <text x="24" y="180" font-size="11">4. firma (r, s) con d y k</text>
+
+  <!-- Servidor -->
+  <rect x="270" y="20" width="200" height="170" fill="#ffffff" stroke="#1d1d1f" stroke-width="1.2"/>
+  <text x="370" y="40" text-anchor="middle" font-weight="bold" font-size="13">Servidor (nodo)</text>
+  <text x="370" y="56" text-anchor="middle" fill="#55565b" font-size="10.5">no tiene ninguna clave privada</text>
+  <text x="284" y="84" font-size="11">5. verifica la firma con Q</text>
+  <text x="284" y="102" font-size="11">6. revisa saldo y contador</text>
+  <text x="284" y="120" font-size="11">7. arma el bloque:</text>
+  <text x="298" y="137" font-size="11">raíz de Merkle (SHA-256)</text>
+  <text x="298" y="154" font-size="11">hash del bloque anterior</text>
+  <text x="298" y="171" font-size="11">prueba de trabajo</text>
+
+  <!-- Cadena -->
+  <rect x="530" y="20" width="180" height="170" fill="#ffffff" stroke="#1d1d1f" stroke-width="1.2"/>
+  <text x="620" y="40" text-anchor="middle" font-weight="bold" font-size="13">Cadena pública</text>
+  <text x="620" y="56" text-anchor="middle" fill="#55565b" font-size="10.5">base de datos, la lee cualquiera</text>
+  <rect x="546" y="70" width="44" height="34" fill="#eef3f8" stroke="#2f5d8a"/>
+  <rect x="598" y="70" width="44" height="34" fill="#eef3f8" stroke="#2f5d8a"/>
+  <rect x="650" y="70" width="44" height="34" fill="#eef3f8" stroke="#2f5d8a"/>
+  <text x="568" y="91" text-anchor="middle" font-size="10">B3</text>
+  <text x="620" y="91" text-anchor="middle" font-size="10">B4</text>
+  <text x="672" y="91" text-anchor="middle" font-size="10">B5</text>
+  <line x1="590" y1="87" x2="597" y2="87" stroke="#2f5d8a" marker-end="url(#ap)"/>
+  <line x1="642" y1="87" x2="649" y2="87" stroke="#2f5d8a" marker-end="url(#ap)"/>
+  <text x="620" y="128" text-anchor="middle" font-size="11">transacciones, Q</text>
+  <text x="620" y="145" text-anchor="middle" font-size="11">y firmas (r, s)</text>
+  <text x="620" y="172" text-anchor="middle" font-size="10.5" fill="#55565b">8. todos validan las reglas</text>
+
+  <!-- Flujos -->
+  <line x1="212" y1="105" x2="268" y2="105" stroke="#2f5d8a" stroke-width="2" marker-end="url(#ap)"/>
+  <text x="240" y="96" text-anchor="middle" font-size="10" fill="#2f5d8a">tx, Q, (r, s)</text>
+  <line x1="472" y1="105" x2="528" y2="105" stroke="#2f5d8a" stroke-width="2" marker-end="url(#ap)"/>
+  <text x="500" y="96" text-anchor="middle" font-size="10" fill="#2f5d8a">bloque</text>
+  <!-- d nunca sale -->
+  <text x="110" y="208" text-anchor="middle" font-size="10.5" fill="#b3261e">d nunca viaja por la red</text>
+
+  <!-- Ataque -->
+  <rect x="270" y="240" width="440" height="80" fill="#fbeceb" stroke="#b3261e" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="490" y="260" text-anchor="middle" font-weight="bold" fill="#b3261e" font-size="13">Atacante (solo lee la cadena)</text>
+  <text x="284" y="280" font-size="11">si una billetera defectuosa repitió k, ve dos firmas con el mismo r:</text>
+  <text x="284" y="298" font-size="11">despeja k y luego d  →  firma pagos como si fuera el dueño</text>
+  <text x="284" y="314" font-size="10.5" fill="#55565b">el validador los acepta: la firma es correcta</text>
+  <path d="M620 192 L620 238" stroke="#b3261e" stroke-width="2" stroke-dasharray="5 3" fill="none" marker-end="url(#as)"/>
+  <text x="628" y="220" font-size="10" fill="#b3261e">lee firmas</text>
+  <path d="M268 290 L110 290 L110 214" stroke="#b3261e" stroke-width="2" stroke-dasharray="5 3" fill="none" marker-end="url(#as)"/>
+  <text x="190" y="284" text-anchor="middle" font-size="10" fill="#b3261e">obtiene d sin tocar el dispositivo</text>
+</svg>
+<div class="legend"><span><i style="color:#b3261e"></i>secreto / ataque</span><span><i style="color:#2f5d8a"></i>público</span></div>
+<figcaption>Figura 1. Flujo de datos y de claves. Con RFC 6979 (paso 3) el nonce no se repite y el camino del atacante no existe.</figcaption>
+</figure>
+
+<h3>Recorrido de una transacción</h3>
+<ol>
+  <li>El dispositivo genera la clave privada <span class="mono">d</span> y calcula la pública <span class="mono">Q = d·G</span>. Solo <span class="mono">Q</span> sale del dispositivo.</li>
+  <li>Para pagar, arma la transacción (destinatario, monto y un contador que impide repetirla), calcula su hash <span class="mono">z</span> y la firma.</li>
+  <li>El servidor verifica la firma usando solo <span class="mono">Q</span>, revisa el saldo y deja la transacción pendiente.</li>
+  <li>Cada cierto tiempo agrupa las pendientes en un bloque: calcula la raíz de Merkle, lo enlaza con el hash del bloque anterior y busca la prueba de trabajo. El bloque queda en la cadena pública.</li>
+  <li>Cualquiera puede revalidar la cadena completa: si alguien cambia un monto, falla la firma y la raíz de Merkle; si además vuelve a minar ese bloque, se rompe el enlace con el siguiente.</li>
+</ol>
+
+<h3>El experimento</h3>
+<p>Una de las billeteras simuladas (Bob) genera <span class="mono">k</span> con un generador defectuoso de solo 8 valores posibles, como el de Android en 2013. Al firmar 10 veces, por el principio del palomar, al menos dos firmas repiten <span class="mono">k</span>. Solo con la cadena se recupera su clave y se firma una transferencia de todo su saldo, que el validador acepta. Con RFC 6979, la misma simulación no entrega ninguna clave.</p>
+
+<!-- ====================================================== 4 -->
+<h2><span>4.</span>Plan de trabajo y rol de cada integrante</h2>
+
+<table>
+  <thead><tr><th>Fase</th><th>Qué se entrega</th><th>Responsable</th></tr></thead>
+  <tbody>
+    <tr><td>1. Fundamentos</td><td>Aritmética modular (inverso con Euclides extendido), suma de puntos y multiplicación escalar en la curva, firma y verificación ECDSA. Comparación con una librería estándar.</td><td>[Nombre 1]</td></tr>
+    <tr><td>2. Cadena</td><td>Transacciones firmadas, árbol de Merkle, enlace por hash, prueba de trabajo y validador que reporte cualquier manipulación.</td><td>[Nombre 2]</td></tr>
+    <tr><td>3. Ataque y defensa</td><td>Detección de nonces repetidos en la cadena, recuperación de <span class="mono">k</span> y <span class="mono">d</span>, transacción falsificada; comparación con RFC 6979.</td><td>[Nombre 1] y [Nombre 2]</td></tr>
+    <tr><td>4. Interfaz</td><td>Explorador web de la cadena y billetera en el celular, para que el público haga transacciones durante la exposición.</td><td>[Nombre 3]</td></tr>
+    <tr><td>5. Pruebas y despliegue</td><td>Pruebas automáticas de cada parte y publicación en internet (servidor y base de datos gratuitos).</td><td>[Nombre 3]</td></tr>
+    <tr><td>6. Informe y exposición</td><td>Documentación, guion de la exposición y ensayo.</td><td>Todos</td></tr>
+  </tbody>
+</table>
+
+<h3>Roles</h3>
+<ul>
+  <li><strong>[Nombre 1], criptografía:</strong> implementa y verifica las primitivas (curva, ECDSA, RFC 6979) y la derivación matemática del ataque.</li>
+  <li><strong>[Nombre 2], blockchain y seguridad:</strong> construye la cadena y el validador, diseña los escenarios de manipulación y el experimento con la billetera defectuosa.</li>
+  <li><strong>[Nombre 3], sistema e interfaz:</strong> construye la aplicación web y la billetera del celular, las pruebas y el despliegue.</li>
+  <li><strong>Todos:</strong> revisan el trabajo de los demás, redactan el informe y preparan la exposición.</li>
+</ul>
+
+<div class="box"><p><strong>Estado actual.</strong> El prototipo funciona y está publicado en <span class="mono">minichain-gacp.onrender.com</span>; el código está en <span class="mono">github.com/santie-a/criptography-ur</span>.</p></div>
+
+</body>
+</html>
