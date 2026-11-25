@@ -1,22 +1,18 @@
-# minichain por consola
+# minichain
 
 Una blockchain pequeña con ECDSA sobre secp256k1 programado desde cero, y el
 ataque que recupera una clave privada cuando una billetera repite el nonce `k`.
 
 ## Cómo ejecutarlo
 
-Requiere Python 3.10 o superior. No necesita instalar nada: la carpeta es
-autocontenida y solo usa la librería estándar.
+Requiere Python 3.10 o superior. No usa librerias externas.
 
-Desde dentro de esta carpeta:
+Para ejecutarlo:
 
 ```bash
 python .              # recorrido completo, unos segundos
-python . --pausa      # espera Enter entre pasos (para exponer)
+python . --pausa      # espera Enter entre pasos
 ```
-
-Desde la carpeta que la contiene también funcionan `python minichain` y
-`python -m minichain`. En algunos sistemas el comando es `python3`.
 
 Opciones:
 
@@ -63,7 +59,6 @@ no encuentra nada.
 - Modelo de cuentas con contador, no UTXO.
 - Direcciones simplificadas (SHA-256 truncado, sin RIPEMD-160 ni Base58Check).
 - Las firmas no se normalizan a *low-s*.
-- La multiplicación escalar no es de tiempo constante. No usar con dinero real.
 - La consola muestra un recorrido fijo: no tiene comandos para crear billeteras
   o enviar transacciones a mano.
 
