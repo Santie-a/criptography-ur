@@ -5,14 +5,18 @@ ataque que recupera una clave privada cuando una billetera repite el nonce `k`.
 
 ## Cómo ejecutarlo
 
-Requiere Python 3.10 o superior. No necesita instalar nada.
+Requiere Python 3.10 o superior. No necesita instalar nada: la carpeta es
+autocontenida y solo usa la librería estándar.
 
-Desde la raíz del repositorio (no desde esta carpeta):
+Desde dentro de esta carpeta:
 
 ```bash
-python -m minichain            # recorrido completo, unos segundos
-python -m minichain --pausa    # espera Enter entre pasos (para exponer)
+python .              # recorrido completo, unos segundos
+python . --pausa      # espera Enter entre pasos (para exponer)
 ```
+
+Desde la carpeta que la contiene también funcionan `python minichain` y
+`python -m minichain`. En algunos sistemas el comando es `python3`.
 
 Opciones:
 
@@ -41,15 +45,6 @@ no encuentra nada.
    validador rechaza cada caso y dice qué regla falló.
 7. **Defensa:** repite todo con RFC 6979 (nonce determinista): ningún `r` se
    repite y no se recupera ninguna clave.
-
-## Pruebas
-
-```bash
-pip install pytest ecdsa
-python -m pytest tests/test_math.py tests/test_ecdsa.py tests/test_chain.py tests/test_attack.py
-```
-
-38 pruebas. Las firmas y los nonces RFC 6979 se comparan con la librería `ecdsa`.
 
 ## Qué funciona
 
